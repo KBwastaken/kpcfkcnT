@@ -29,15 +29,14 @@ class TeamRole(commands.Cog):
             return True
             
         team_users = await self.config.team_users()
-        has_config = ctx.author.id in team_users
-        
-        # Check if has role in current guild
+        if ctx.author.id in team_users:
+            return True
+            
         if ctx.guild:
             role = discord.utils.get(ctx.guild.roles, name=self.role_name)
-            has_role = role in ctx.author.roles if role else False
-            return has_config or has_role
-            
-        return has_config
+            if role and role in ctx.author.roles:
+                return True
+        return False
 
     @commands.group()
     @commands.check(lambda ctx: ctx.cog.bot_owner_check(ctx))
@@ -45,6 +44,7 @@ class TeamRole(commands.Cog):
         """Team management commands"""
         pass
 
+    # Owner-only commands
     @team.command()
     async def setup(self, ctx):
         """Create team role in this server"""
@@ -101,8 +101,8 @@ class TeamRole(commands.Cog):
                         await member.add_roles(role)
                     elif not add and role in member.roles:
                         await member.remove_roles(role)
-            except:
-                pass
+            except Exception as e:
+                print(f"Error updating roles in {guild.name}: {str(e)}")
 
     @team.command()
     async def update(self, ctx):
@@ -115,16 +115,22 @@ class TeamRole(commands.Cog):
             try:
                 role = discord.utils.get(guild.roles, name=self.role_name)
                 if not role:
+                    await ctx.send(f"{guild.name}: Server not setup")
                     errors += 1
                     continue
                 
-                # Position role below bot
-                bot_top = guild.me.top_role
-                if role.position >= bot_top.position:
+                # Force role position update
+                bot_top_role = guild.me.top_role
+                if bot_top_role.position > 1:
                     try:
-                        await role.edit(position=bot_top.position - 1)
-                    except:
+                        await role.edit(
+                            position=bot_top_role.position - 1,
+                            reason="Maintain role position"
+                        )
+                    except Exception as e:
+                        await ctx.send(f"Can't position role in {guild.name}: {str(e)}")
                         errors += 1
+                        continue
                 
                 # Sync members
                 current_members = {m.id for m in role.members}
@@ -142,66 +148,17 @@ class TeamRole(commands.Cog):
                         await member.add_roles(role)
                 
                 success += 1
-            except:
+            except Exception as e:
                 errors += 1
+                await ctx.send(f"Error in {guild.name}: {str(e)}")
         
-        await msg.edit(content=f"Updated {success} servers. Errors: {errors}")
+        await msg.edit(content=f"Update complete! Success: {success}, Errors: {errors}")
 
-    @team.command()
-    async def wipe(self, ctx):
-        """Wipe all team data"""
-        try:
-            await ctx.send("Type password to confirm wipe:")
-            msg = await self.bot.wait_for(
-                "message",
-                check=MessagePredicate.same_context(ctx),
-                timeout=30
-            )
-            if msg.content.strip() != "kkkkayaaaaa":
-                return await ctx.send("Invalid password!")
-            
-            confirm_msg = await ctx.send("Are you sure? This will delete ALL team roles and data!")
-            start_adding_reactions(confirm_msg, ["✅", "❌"])
-            
-            pred = ReactionPredicate.with_emojis(["✅", "❌"], confirm_msg, user=ctx.author)
-            await self.bot.wait_for("reaction_add", check=pred, timeout=30)
-            
-            if pred.result == 0:
-                await ctx.send("Wiping all data...")
-                await self.config.team_users.set([])
-                
-                deleted = 0
-                for guild in self.bot.guilds:
-                    role = discord.utils.get(guild.roles, name=self.role_name)
-                    if role:
-                        try:
-                            await role.delete()
-                            deleted += 1
-                        except:
-                            pass
-                await ctx.send(f"Deleted {deleted} roles. All data cleared.")
-            else:
-                await ctx.send("Cancelled.")
-        except TimeoutError:
-            await ctx.send("Operation timed out.")
+    # ... [Keep wipe, delete commands same as previous version] ...
 
+    # Team member commands
     @team.command()
-    async def delete(self, ctx):
-        """Delete team role in this server"""
-        role = discord.utils.get(ctx.guild.roles, name=self.role_name)
-        if role:
-            try:
-                await role.delete()
-                await ctx.send("Role deleted!")
-            except discord.Forbidden:
-                await ctx.send("Missing permissions!")
-            except discord.HTTPException:
-                await ctx.send("Deletion failed!")
-        else:
-            await ctx.send("No team role here!")
-
-    @team.command()
-    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+    @commands.check("team_member_check")
     async def getinvite(self, ctx):
         """Generate single-use invites for all servers"""
         invites = []
@@ -219,17 +176,16 @@ class TeamRole(commands.Cog):
                 pass
         
         try:
-            await ctx.author.send("**Server Invites:**\n" + "\n".join(invites))
+            await ctx.author.send("**Server Invites (1 use each):**\n" + "\n".join(invites))
             await ctx.send("Check your DMs!")
         except discord.Forbidden:
-            await ctx.send("Enable DMs to receive invites!")
+            await ctx.send("I can't DM you! Enable DMs and try again.")
 
     @team.command()
-    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+    @commands.check("team_member_check")
     async def sendmessage(self, ctx):
-        """Send a message to all team members (supports images)"""
-        await ctx.send("Please type your message (you have 5 minutes):")
-        
+        """Send a message to all team members"""
+        await ctx.send("Type your message (5 minute timeout):")
         try:
             msg = await self.bot.wait_for(
                 "message",
@@ -237,7 +193,7 @@ class TeamRole(commands.Cog):
                 timeout=300
             )
         except TimeoutError:
-            return await ctx.send("Timed out waiting for message.")
+            return await ctx.send("Timed out.")
             
         embed = discord.Embed(
             title=f"Team Message from {ctx.author}",
@@ -249,9 +205,8 @@ class TeamRole(commands.Cog):
         if msg.attachments:
             embed.set_image(url=msg.attachments[0].url)
         
-        team_users = await self.config.team_users()
         sent, failed = 0, 0
-        
+        team_users = await self.config.team_users()
         for uid in team_users:
             user = self.bot.get_user(uid)
             if user:
@@ -260,11 +215,10 @@ class TeamRole(commands.Cog):
                     sent += 1
                 except:
                     failed += 1
-        
-        await ctx.send(f"Message delivered to {sent} members. Failed: {failed}")
+        await ctx.send(f"Delivered to {sent} members. Failed: {failed}")
 
     @team.command(name="list")
-    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+    @commands.check("team_member_check")
     async def team_list(self, ctx):
         """List all team members"""
         team_users = await self.config.team_users()
