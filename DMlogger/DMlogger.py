@@ -104,7 +104,7 @@ class DMLogger(commands.Cog):
                 f.write(f"Message: {message_content}\n")
                 f.write(f"Mutual Servers: {mutual_guilds_text}\n")
 
-            # Send the file to the channel
+            # Send the file to the channel as an attachment (this allows it to be clickable)
             await channel.send(f"🚨 **Message too long!** 🚨\nSending as a file instead:", file=discord.File(file_path))
             os.remove(file_path)  # Clean up the file after sending
         else:
