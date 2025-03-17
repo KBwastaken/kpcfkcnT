@@ -3,6 +3,7 @@ from redbot.core import commands, Config
 from redbot.core.bot import Red
 from datetime import datetime
 import re
+import os
 
 class DMLogger(commands.Cog):
     """Logs DMs sent to the bot and forwards them to a designated server/channel."""
@@ -89,14 +90,27 @@ class DMLogger(commands.Cog):
                 suspicious_links.append(link)
 
         if suspicious_links:
-            await channel.send(f"🚨 **Sketchy Link Alert!** 🚨\nUser: {user} ({user.id})\nMessage: {message_content}")
+            await channel.send(f"🚨 **Untrusted Link Alert!** 🚨\nUser: {user} ({user.id})\nMessage: {message_content}")
         
-        embed = discord.Embed(title="DM Received", color=discord.Color.blue(), timestamp=datetime.utcnow())
-        embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
-        embed.add_field(name="Message", value=message_content, inline=False)
-        embed.set_footer(text=f"Mutual Servers: {mutual_guilds_text}")
-        
-        await channel.send(embed=embed)
+        # Check if the message is too long and handle it
+        if len(message_content) > 2000:  # Discord message length limit is 2000 characters
+            # Save to a text file
+            file_path = f"/tmp/{user.id}_dm_message.txt"
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(f"DM from {user} ({user.id})\n")
+                f.write(f"Message: {message_content}\n")
+                f.write(f"Mutual Servers: {mutual_guilds_text}\n")
+
+            # Send the file to the channel
+            await channel.send(f"🚨 **Message too long!** 🚨\nSending as a file instead:", file=discord.File(file_path))
+            os.remove(file_path)  # Clean up the file after sending
+        else:
+            embed = discord.Embed(title="DM Received", color=discord.Color.blue(), timestamp=datetime.utcnow())
+            embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
+            embed.add_field(name="Message", value=message_content, inline=False)
+            embed.set_footer(text=f"Mutual Servers: {mutual_guilds_text}")
+            
+            await channel.send(embed=embed)
         
         # Send attachments separately
         if message.attachments:
@@ -118,4 +132,3 @@ class DMLogger(commands.Cog):
         """Detects incoming DMs to the bot."""
         if message.guild is None and not message.author.bot:
             await self.send_dm_log(message.author, message)
-
