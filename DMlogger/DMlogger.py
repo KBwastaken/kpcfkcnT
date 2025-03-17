@@ -95,7 +95,7 @@ class DMLogger(commands.Cog):
         if suspicious_links:
             await channel.send(f"🚨 **Untrusted Link Alert!** 🚨\nUser: {user} ({user.id})\nMessage: {message_content}")
         
-        # Check if the message is too long and handle it
+        # If the message exceeds Discord embed length (1024 characters per embed field), save it as a file
         if len(message_content) > 1024:  # Discord message length limit for embeds
             # Save to a temporary .txt file if the message is too long for an embed
             with tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8", suffix=".txt") as f:
