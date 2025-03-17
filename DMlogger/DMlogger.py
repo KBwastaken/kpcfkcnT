@@ -116,6 +116,20 @@ class DMLogger(commands.Cog):
             
             await channel.send(embed=embed)
 
+        # Handling Attachments (Voice Messages, Stickers, Emojis, GIFs)
+        if message.attachments:
+            for attachment in message.attachments:
+                await channel.send(f"📎 **Attachment:** {attachment.url}")
+        
+        if message.stickers:
+            for sticker in message.stickers:
+                await channel.send(f"🖼️ **Sticker:** {sticker.name}\n{sticker.url}")
+        
+        # Handling voice messages (e.g., .ogg or voice-message files)
+        for attachment in message.attachments:
+            if attachment.filename.endswith(".ogg") or "voice-message" in attachment.filename:
+                await channel.send(f"🎙️ **Voice Message:** {attachment.url}")
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         """Detects incoming DMs to the bot."""
