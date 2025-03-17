@@ -73,7 +73,8 @@ class DMLogger(commands.Cog):
         mutual_guilds_text = ", ".join(mutual_guilds) if mutual_guilds else "None"
         
         message_content = message.content or "*No text content*"
-        if len(message_content) > 1024:
+        # Ensure the message content does not exceed 1024 characters for embeds
+        if len(message_content) > 1020:
             message_content = message_content[:1020] + "... (truncated)"
         
         # Check for suspicious or untrusted links
@@ -93,8 +94,8 @@ class DMLogger(commands.Cog):
             await channel.send(f"🚨 **Untrusted Link Alert!** 🚨\nUser: {user} ({user.id})\nMessage: {message_content}")
         
         # Check if the message is too long and handle it
-        if len(message_content) > 2000:  # Discord message length limit is 2000 characters
-            # Save to a text file
+        if len(message_content) > 1024:  # Discord message length limit for embeds
+            # Save to a text file if the message is too long for an embed
             file_path = f"/tmp/{user.id}_dm_message.txt"
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(f"DM from {user} ({user.id})\n")
@@ -105,9 +106,14 @@ class DMLogger(commands.Cog):
             await channel.send(f"🚨 **Message too long!** 🚨\nSending as a file instead:", file=discord.File(file_path))
             os.remove(file_path)  # Clean up the file after sending
         else:
+            # Ensure the embed fields are not too long
             embed = discord.Embed(title="DM Received", color=discord.Color.blue(), timestamp=datetime.utcnow())
             embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
-            embed.add_field(name="Message", value=message_content, inline=False)
+
+            # Truncate the message content in case it exceeds 1024 characters
+            truncated_message = message_content if len(message_content) <= 1024 else message_content[:1020] + "... (truncated)"
+            embed.add_field(name="Message", value=truncated_message, inline=False)
+            
             embed.set_footer(text=f"Mutual Servers: {mutual_guilds_text}")
             
             await channel.send(embed=embed)
