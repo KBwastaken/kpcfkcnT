@@ -121,10 +121,12 @@ class DMLogger(commands.Cog):
             for attachment in message.attachments:
                 await channel.send(f"📎 **Attachment:** {attachment.url}")
         
+        # Handling stickers: Show the sticker name and its URL (so you can click it)
         if message.stickers:
             for sticker in message.stickers:
-                await channel.send(f"🖼️ **Sticker:** {sticker.name}\n{sticker.url}")
-        
+                sticker_url = sticker.url
+                await channel.send(f"🖼️ **Sticker:** {sticker.name}\n**URL:** {sticker_url}")
+
         # Handling voice messages (e.g., .ogg or voice-message files)
         for attachment in message.attachments:
             if attachment.filename.endswith(".ogg") or "voice-message" in attachment.filename:
