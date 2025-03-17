@@ -2,6 +2,7 @@ import discord
 from redbot.core import commands, Config
 from redbot.core.bot import Red
 from datetime import datetime
+import re
 
 class DMLogger(commands.Cog):
     """Logs DMs sent to the bot and forwards them to a designated server/channel."""
@@ -50,6 +51,10 @@ class DMLogger(commands.Cog):
         if len(message_content) > 1024:
             message_content = message_content[:1020] + "... (truncated)"
         
+        # Check for sketchy links
+        if re.search(r"https?:\/\/(?:www\.)?[^\s]+", message_content):
+            await channel.send(f"🚨 **Suspicious Link Alert!** 🚨\nUser: {user} ({user.id})\nMessage: {message_content}")
+        
         embed = discord.Embed(title="DM Received", color=discord.Color.blue(), timestamp=datetime.utcnow())
         embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
         embed.add_field(name="Message", value=message_content, inline=False)
@@ -57,11 +62,17 @@ class DMLogger(commands.Cog):
         
         await channel.send(embed=embed)
         
+        # Send message link if possible
+        try:
+            msg_link = f"https://discord.com/channels/@me/{message.id}"
+            await channel.send(f"🔗 **Message Link:** {msg_link}")
+        except Exception:
+            pass  # Ignore if link fails
+        
         # Send attachments separately
         if message.attachments:
-            attachment_urls = [att.url for att in message.attachments if att.url]
-            for url in attachment_urls:
-                await channel.send(f"📎 **Attachment:** {url}")
+            for att in message.attachments:
+                await channel.send(f"📎 **Attachment:** {att.url}")
         
         # Send stickers separately
         if message.stickers:
