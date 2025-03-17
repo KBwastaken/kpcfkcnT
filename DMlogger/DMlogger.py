@@ -17,11 +17,11 @@ class DMLogger(commands.Cog):
         """Set the server and channel where DMs should be logged."""
         guild = self.bot.get_guild(guild_id)
         if not guild:
-            return await ctx.send("Invalid Guild ID.")
+            return await ctx.send("Invalid Guild ID or bot is not in the server.")
         
         channel = guild.get_channel(channel_id)
         if not channel:
-            return await ctx.send("Invalid Channel ID.")
+            return await ctx.send("Invalid Channel ID or bot lacks permission.")
         
         await self.config.dm_guild.set(guild_id)
         await self.config.dm_channel.set(channel_id)
@@ -50,8 +50,24 @@ class DMLogger(commands.Cog):
         embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
         embed.add_field(name="Message", value=message.content or "*No text content*", inline=False)
         
+        # Check for attachments (images, gifs, voice messages)
         if message.attachments:
-            embed.set_image(url=message.attachments[0].url)
+            attachment_urls = [att.url for att in message.attachments if att.url]
+            if attachment_urls:
+                embed.add_field(name="Attachments", value="\n".join(attachment_urls), inline=False)
+                embed.set_image(url=attachment_urls[0])
+        
+        # Check for stickers
+        if message.stickers:
+            sticker = message.stickers[0] if message.stickers else None
+            if sticker:
+                embed.add_field(name="Sticker", value=sticker.name, inline=False)
+                if sticker.url:
+                    embed.set_image(url=sticker.url)
+        
+        # Check for emojis (Only custom emojis will have URLs)
+        if message.guild and any(char for char in message.content if isinstance(char, discord.Emoji)):
+            embed.add_field(name="Emojis", value=message.content, inline=False)
         
         embed.set_footer(text=f"Mutual Servers: {mutual_guilds_text}")
         
