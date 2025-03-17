@@ -119,5 +119,3 @@ class DMLogger(commands.Cog):
         if message.guild is None and not message.author.bot:
             await self.send_dm_log(message.author, message)
 
-async def setup(bot: Red):
-    await bot.add_cog(DMLogger(bot)
