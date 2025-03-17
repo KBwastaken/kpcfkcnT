@@ -96,8 +96,8 @@ class DMLogger(commands.Cog):
         
         # Check if the message is too long and handle it
         if len(message_content) > 1024:  # Discord message length limit for embeds
-            # Save to a temporary text file if the message is too long for an embed
-            with tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8") as f:
+            # Save to a temporary .txt file if the message is too long for an embed
+            with tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8", suffix=".txt") as f:
                 file_path = f.name
                 f.write(f"DM from {user} ({user.id})\n")
                 f.write(f"Message: {message_content}\n")
