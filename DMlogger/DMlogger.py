@@ -55,18 +55,18 @@ class DMLogger(commands.Cog):
             attachment_urls = [att.url for att in message.attachments if att.url]
             if attachment_urls:
                 embed.add_field(name="Attachments", value="\n".join(attachment_urls), inline=False)
-                embed.set_image(url=attachment_urls[0])
+                if any(url.endswith(('.png', '.jpg', '.jpeg', '.gif')) for url in attachment_urls):
+                    embed.set_image(url=attachment_urls[0])
         
         # Check for stickers
         if message.stickers:
             sticker = message.stickers[0] if message.stickers else None
             if sticker:
                 embed.add_field(name="Sticker", value=sticker.name, inline=False)
-                if sticker.url:
-                    embed.set_image(url=sticker.url)
+                embed.set_image(url=sticker.url)
         
         # Check for emojis (Only custom emojis will have URLs)
-        if message.guild and any(char for char in message.content if isinstance(char, discord.Emoji)):
+        if any(isinstance(char, discord.Emoji) for char in message.content):
             embed.add_field(name="Emojis", value=message.content, inline=False)
         
         embed.set_footer(text=f"Mutual Servers: {mutual_guilds_text}")
