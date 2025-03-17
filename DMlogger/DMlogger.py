@@ -89,7 +89,7 @@ class DMLogger(commands.Cog):
                 suspicious_links.append(link)
 
         if suspicious_links:
-            await channel.send(f"🚨 **Untrusted Link Alert!** 🚨\nUser: {user} ({user.id})\nMessage: {message_content}")
+            await channel.send(f"🚨 **Sketchy Link Alert!** 🚨\nUser: {user} ({user.id})\nMessage: {message_content}")
         
         embed = discord.Embed(title="DM Received", color=discord.Color.blue(), timestamp=datetime.utcnow())
         embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
