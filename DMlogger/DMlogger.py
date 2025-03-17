@@ -45,33 +45,33 @@ class DMLogger(commands.Cog):
         
         mutual_guilds = [g.name for g in self.bot.guilds if g.get_member(user.id)]
         mutual_guilds_text = ", ".join(mutual_guilds) if mutual_guilds else "None"
-
+        
+        message_content = message.content or "*No text content*"
+        if len(message_content) > 1024:
+            message_content = message_content[:1020] + "... (truncated)"
+        
         embed = discord.Embed(title="DM Received", color=discord.Color.blue(), timestamp=datetime.utcnow())
         embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
-        embed.add_field(name="Message", value=message.content or "*No text content*", inline=False)
-        
-        # Check for attachments (images, gifs, voice messages)
-        if message.attachments:
-            attachment_urls = [att.url for att in message.attachments if att.url]
-            if attachment_urls:
-                embed.add_field(name="Attachments", value="\n".join(attachment_urls), inline=False)
-                if any(url.endswith(('.png', '.jpg', '.jpeg', '.gif')) for url in attachment_urls):
-                    embed.set_image(url=attachment_urls[0])
-        
-        # Check for stickers
-        if message.stickers:
-            sticker = message.stickers[0] if message.stickers else None
-            if sticker:
-                embed.add_field(name="Sticker", value=sticker.name, inline=False)
-                embed.set_image(url=sticker.url)
-        
-        # Check for emojis (Only custom emojis will have URLs)
-        if any(isinstance(char, discord.Emoji) for char in message.content):
-            embed.add_field(name="Emojis", value=message.content, inline=False)
-        
+        embed.add_field(name="Message", value=message_content, inline=False)
         embed.set_footer(text=f"Mutual Servers: {mutual_guilds_text}")
         
         await channel.send(embed=embed)
+        
+        # Send attachments separately
+        if message.attachments:
+            attachment_urls = [att.url for att in message.attachments if att.url]
+            for url in attachment_urls:
+                await channel.send(f"📎 **Attachment:** {url}")
+        
+        # Send stickers separately
+        if message.stickers:
+            for sticker in message.stickers:
+                await channel.send(f"🖼️ **Sticker:** {sticker.name}\n{sticker.url}")
+        
+        # Voice message detection (if applicable)
+        for attachment in message.attachments:
+            if attachment.filename.endswith(".ogg") or "voice-message" in attachment.filename:
+                await channel.send(f"🎙️ **Voice Message:** {attachment.url}")
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
