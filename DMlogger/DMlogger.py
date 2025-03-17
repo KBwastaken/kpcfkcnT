@@ -85,7 +85,7 @@ class DMLogger(commands.Cog):
                 suspicious_links.append(link)
             elif "youtu.be" in domain:  # Block shortened YouTube links specifically
                 suspicious_links.append(link)
-            elif domain not in self.trusted_domains:
+            elif domain not in self.trusted_domains:  # Allow YouTube and other trusted domains
                 suspicious_links.append(link)
 
         if suspicious_links:
@@ -118,3 +118,6 @@ class DMLogger(commands.Cog):
         """Detects incoming DMs to the bot."""
         if message.guild is None and not message.author.bot:
             await self.send_dm_log(message.author, message)
+
+async def setup(bot: Red):
+    await bot.add_cog(DMLogger(bot))
