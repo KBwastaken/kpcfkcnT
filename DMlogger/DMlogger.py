@@ -80,12 +80,12 @@ class DMLogger(commands.Cog):
         for link in re.findall(r"https?:\/\/(?:www\.)?[^\s]+", message_content):
             domain = link.split("/")[2]
             
-            # Block scam domains and YouTube short links (e.g., youtu.be)
-            if domain in self.scam_domains:
+            # Allow YouTube domain and block shortened YouTube (youtu.be) links
+            if "youtube.com" in domain and "youtu.be" not in domain:
+                continue  # It's a valid YouTube link
+            elif domain in self.scam_domains:  # Block known scam domains
                 suspicious_links.append(link)
-            elif "youtu.be" in domain:  # Block shortened YouTube links specifically
-                suspicious_links.append(link)
-            elif domain not in self.trusted_domains:  # Allow YouTube and other trusted domains
+            elif domain not in self.trusted_domains:  # Allow other trusted domains
                 suspicious_links.append(link)
 
         if suspicious_links:
@@ -120,4 +120,4 @@ class DMLogger(commands.Cog):
             await self.send_dm_log(message.author, message)
 
 async def setup(bot: Red):
-    await bot.add_cog(DMLogger(bot))
+    await bot.add_cog(DMLogger(bot)
