@@ -1,32 +1,41 @@
 import discord
-from discord.ext import commands, tasks
-from discord.ui import Button, View
-from datetime import datetime, timedelta
+from redbot.core import commands, Config
+from redbot.core.bot import Red
+from datetime import datetime
 import re
-import asyncio
+import tempfile
+import os
 
 class DMLogger(commands.Cog):
-    """Logs DMs sent to the bot, handles spam detection, blocks users, and provides unblock button."""
+    """Logs DMs sent to the bot and forwards them to a designated server/channel."""
 
     def __init__(self, bot: Red):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=9876543210, force_registration=True)
         self.config.register_global(dm_guild=None, dm_channel=None)
         
+        # Predefined list of trusted domains
         self.trusted_domains = [
-            "youtube.com", "discord.com", "github.com", "twitter.com", 
-            "facebook.com", "reddit.com", "twitch.tv"
+            "youtube.com",   # All YouTube domains allowed (including youtu.be)
+            "discord.com",   # Discord links allowed
+            "github.com",    # GitHub links allowed
+            "twitter.com",   # Twitter links allowed
+            "facebook.com",  # Facebook links allowed
+            "reddit.com",    # Reddit links allowed
+            "twitch.tv",     # Twitch links allowed
         ]
-        
+
+        # Predefined list of known scam/malicious domains
         self.scam_domains = [
-            "bit.ly", "t.co", "tinyurl.com", "shortlink.com", "is.gd", 
-            "goo.gl", "freebitco.in", "coinurl.com"
+            "bit.ly",        # URL shortener often used for scams
+            "t.co",          # Twitter's short URL
+            "tinyurl.com",   # URL shortener often misused
+            "shortlink.com", # Spammy URL shortener
+            "is.gd",         # URL shortener associated with spam
+            "goo.gl",        # Retired short URL, but could still be used for malicious purposes
+            "freebitco.in",  # Known for spam and fraud
+            "coinurl.com",   # URL shortener for crypto scams
         ]
-        
-        self.user_spam_data = {}  # To track user messages and time to detect spamming
-        self.spam_limit = 15  # Messages in a short time period (5 seconds)
-        self.spam_timeframe = 5  # 5 seconds to detect spam
-        self.blocked_users = set()  # Set of blocked users
 
     @commands.admin()
     @commands.command()
@@ -46,26 +55,6 @@ class DMLogger(commands.Cog):
 
     async def send_dm_log(self, user: discord.User, message: discord.Message):
         """Handles forwarding the DM to the configured channel."""
-        if user.id in self.blocked_users:
-            await message.author.send("You are currently blocked for spamming the bot.")
-            return  # Block further processing
-        
-        # Track user spam activity
-        now = datetime.utcnow()
-        if user.id not in self.user_spam_data:
-            self.user_spam_data[user.id] = []
-        
-        self.user_spam_data[user.id].append(now)
-        
-        # Remove outdated timestamps (messages outside the spam time frame)
-        self.user_spam_data[user.id] = [timestamp for timestamp in self.user_spam_data[user.id] if (now - timestamp).total_seconds() <= self.spam_timeframe]
-        
-        # If the user has sent more than the allowed amount of messages within the timeframe, block them
-        if len(self.user_spam_data[user.id]) > self.spam_limit:
-            await self.block_user(user)
-            return
-        
-        # Regular message processing after spam check
         guild_id = await self.config.dm_guild()
         channel_id = await self.config.dm_channel()
         
@@ -84,60 +73,64 @@ class DMLogger(commands.Cog):
         mutual_guilds_text = ", ".join(mutual_guilds) if mutual_guilds else "None"
         
         message_content = message.content or "*No text content*"
-        if len(message_content) > 1024:
+        # Ensure the message content does not exceed 1024 characters for embeds
+        if len(message_content) > 1020:
             message_content = message_content[:1020] + "... (truncated)"
         
-        # Check for suspicious links
-        if re.search(r"https?:\/\/(?:www\.)?[^\s]+", message_content):
-            if any(domain in message_content for domain in self.scam_domains):
-                await channel.send(f"🚨 **Suspicious Link Alert!** 🚨\nUser: {user} ({user.id})\nMessage: {message_content}")
-            elif any(domain in message_content for domain in self.trusted_domains):
-                pass  # Trusted domains are allowed, no alert
-            else:
-                await channel.send(f"⚠️ **Link Alert!** ⚠️\nUser: {user} ({user.id})\nMessage: {message_content}")
+        # Check for suspicious or untrusted links
+        suspicious_links = []
+        for link in re.findall(r"https?:\/\/(?:www\.)?[^\s]+", message_content):
+            domain = link.split("/")[2]
+            
+            # Allow YouTube domains (both youtube.com and youtu.be)
+            if "youtube.com" in domain or "youtu.be" in domain:
+                continue  # It's a valid YouTube link
+            
+            # Block known scam domains
+            elif domain in self.scam_domains:
+                suspicious_links.append(link)
+            elif domain not in self.trusted_domains:  # Allow other trusted domains
+                suspicious_links.append(link)
 
-        embed = discord.Embed(title="DM Received", color=discord.Color.blue(), timestamp=datetime.utcnow())
-        embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
-        embed.add_field(name="Message", value=message_content, inline=False)
-        embed.set_footer(text=f"Mutual Servers: {mutual_guilds_text}")
+        if suspicious_links:
+            await channel.send(f"🚨 **Link Alert!** 🚨\nUser: {user} ({user.id})\nMessage: {message_content}")
         
-        await channel.send(embed=embed)
+        # If the message exceeds Discord embed length (1024 characters per embed field), save it as a file
+        if len(message_content) > 1024:  # Discord message length limit for embeds
+            # Save to a temporary .txt file if the message is too long for an embed
+            with tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8", suffix=".txt") as f:
+                file_path = f.name
+                f.write(f"DM from {user} ({user.id})\n")
+                f.write(f"Message: {message_content}\n")
+                f.write(f"Mutual Servers: {mutual_guilds_text}\n")
 
+            # Send the file to the channel as an attachment (this allows it to be clickable)
+            await channel.send(f"🚨 **Message too long!** 🚨\nSending as a file instead:", file=discord.File(file_path))
+            os.remove(file_path)  # Clean up the file after sending
+        else:
+            # Ensure the embed fields are not too long
+            embed = discord.Embed(title="DM Received", color=discord.Color.blue(), timestamp=datetime.utcnow())
+            embed.add_field(name="From", value=f"{user} ({user.id})", inline=False)
+            embed.add_field(name="Message", value=message_content, inline=False)
+            embed.set_footer(text=f"Mutual Servers: {mutual_guilds_text}")
+            
+            await channel.send(embed=embed)
+
+        # Handling Attachments (Voice Messages, Stickers, Emojis, GIFs)
         if message.attachments:
             for attachment in message.attachments:
                 await channel.send(f"📎 **Attachment:** {attachment.url}")
         
+        # Handling stickers: Show the sticker name and its URL (so you can click it)
         if message.stickers:
             for sticker in message.stickers:
                 sticker_url = sticker.url
                 await channel.send(f"🖼️ **Sticker:** {sticker.name}\n**URL:** {sticker_url}")
-        
+
+        # Handling voice messages (e.g., .ogg or voice-message files)
         for attachment in message.attachments:
             if attachment.filename.endswith(".ogg") or "voice-message" in attachment.filename:
                 await channel.send(f"🎙️ **Voice Message:** {attachment.url}")
-
-    async def block_user(self, user: discord.User):
-        """Block the user and send a message with an unblock button."""
-        self.blocked_users.add(user.id)  # Add to the blocked set
-        # Send a message with a button to unblock the user
-        unblock_button = Button(label="Unblock User", style=discord.ButtonStyle.green)
-        
-        async def unblock_callback(interaction):
-            if interaction.user.guild_permissions.administrator:
-                self.blocked_users.discard(user.id)  # Remove from blocked users
-                await interaction.response.send_message(f"User {user} has been unblocked.", ephemeral=True)
-                unblock_message = await interaction.channel.fetch_message(interaction.message.id)
-                await unblock_message.delete()  # Remove the unblock message once clicked
-            else:
-                await interaction.response.send_message("You don't have permission to unblock users.", ephemeral=True)
-        
-        unblock_button.callback = unblock_callback
-        view = View()
-        view.add_item(unblock_button)
-        
-        # Send the message with the unblock button and pin it
-        unblock_message = await interaction.channel.send(f"User {user} has been blocked for spamming. Click the button below to unblock them.", view=view)
-        await unblock_message.pin()
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
