@@ -3,6 +3,7 @@ from redbot.core import commands, Config
 from redbot.core.bot import Red
 from datetime import datetime
 import re
+import tempfile
 import os
 
 class DMLogger(commands.Cog):
@@ -95,9 +96,9 @@ class DMLogger(commands.Cog):
         
         # Check if the message is too long and handle it
         if len(message_content) > 1024:  # Discord message length limit for embeds
-            # Save to a text file if the message is too long for an embed
-            file_path = f"/tmp/{user.id}_dm_message.txt"
-            with open(file_path, "w", encoding="utf-8") as f:
+            # Save to a temporary text file if the message is too long for an embed
+            with tempfile.NamedTemporaryFile(delete=False, mode="w", encoding="utf-8") as f:
+                file_path = f.name
                 f.write(f"DM from {user} ({user.id})\n")
                 f.write(f"Message: {message_content}\n")
                 f.write(f"Mutual Servers: {mutual_guilds_text}\n")
@@ -138,3 +139,4 @@ class DMLogger(commands.Cog):
         """Detects incoming DMs to the bot."""
         if message.guild is None and not message.author.bot:
             await self.send_dm_log(message.author, message)
+
