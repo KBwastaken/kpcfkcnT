@@ -10,7 +10,31 @@ class DMLogger(commands.Cog):
     def __init__(self, bot: Red):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=9876543210, force_registration=True)
-        self.config.register_global(dm_guild=None, dm_channel=None, trusted_domains=[])
+        self.config.register_global(dm_guild=None, dm_channel=None)
+        
+        # Predefined list of trusted domains
+        self.trusted_domains = [
+            "youtube.com",   # All YouTube domains allowed
+            "discord.com",   # Discord links allowed
+            "github.com",    # GitHub links allowed
+            "twitter.com",   # Twitter links allowed
+            "facebook.com",  # Facebook links allowed
+            "reddit.com",    # Reddit links allowed
+            "twitch.tv",     # Twitch links allowed
+        ]
+
+        # Predefined list of known scam/malicious domains
+        self.scam_domains = [
+            "youtu.be",      # YouTube short URL
+            "bit.ly",        # URL shortener often used for scams
+            "t.co",          # Twitter's short URL
+            "tinyurl.com",   # URL shortener often misused
+            "shortlink.com", # Spammy URL shortener
+            "is.gd",         # URL shortener associated with spam
+            "goo.gl",        # Retired short URL, but could still be used for malicious purposes
+            "freebitco.in",  # Known for spam and fraud
+            "coinurl.com",   # URL shortener for crypto scams
+        ]
 
     @commands.admin()
     @commands.command()
@@ -27,18 +51,6 @@ class DMLogger(commands.Cog):
         await self.config.dm_guild.set(guild_id)
         await self.config.dm_channel.set(channel_id)
         await ctx.send(f"DMs will now be logged in {guild.name} - {channel.mention}")
-
-    @commands.admin()
-    @commands.command()
-    async def addtrusted(self, ctx, domain: str):
-        """Add a trusted domain to the list."""
-        trusted_domains = await self.config.trusted_domains()
-        if domain not in trusted_domains:
-            trusted_domains.append(domain)
-            await self.config.trusted_domains.set(trusted_domains)
-            await ctx.send(f"{domain} has been added to the trusted domains list.")
-        else:
-            await ctx.send(f"{domain} is already in the trusted domains list.")
 
     async def send_dm_log(self, user: discord.User, message: discord.Message):
         """Handles forwarding the DM to the configured channel."""
@@ -63,14 +75,17 @@ class DMLogger(commands.Cog):
         if len(message_content) > 1024:
             message_content = message_content[:1020] + "... (truncated)"
         
-        # Get trusted domains from config
-        trusted_domains = await self.config.trusted_domains()
-
         # Check for suspicious or untrusted links
         suspicious_links = []
         for link in re.findall(r"https?:\/\/(?:www\.)?[^\s]+", message_content):
             domain = link.split("/")[2]
-            if domain not in trusted_domains:
+            
+            # Block scam domains and YouTube short links (e.g., youtu.be)
+            if domain in self.scam_domains:
+                suspicious_links.append(link)
+            elif "youtu.be" in domain:  # Block shortened YouTube links specifically
+                suspicious_links.append(link)
+            elif domain not in self.trusted_domains:
                 suspicious_links.append(link)
 
         if suspicious_links:
