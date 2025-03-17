@@ -82,6 +82,10 @@ class DMLogger(commands.Cog):
         for link in re.findall(r"https?:\/\/(?:www\.)?[^\s]+", message_content):
             domain = link.split("/")[2]
             
+            # Allow YouTube domains (both youtube.com and youtu.be)
+            if "youtube.com" in domain or "youtu.be" in domain:
+                continue  # It's a valid YouTube link
+            
             # Block known scam domains
             elif domain in self.scam_domains:
                 suspicious_links.append(link)
