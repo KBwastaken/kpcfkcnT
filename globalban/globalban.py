@@ -2,9 +2,8 @@ import discord
 from discord.ext import commands
 from discord.ui import Button, View
 import json
-import asyncio
 
-class GlobalBanCog(commands.Cog):
+class GlobalBan(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.globalbans = self.loadbans()  # Load any pre-existing global bans
@@ -12,7 +11,7 @@ class GlobalBanCog(commands.Cog):
         self.loggingchannel = None  # Channel for global ban logs
 
     def loadbans(self):
-        # Load the global bans from a JSON file (can be replaced with database logic if needed)
+        """Load the global bans from a JSON file (replace with DB logic if needed)."""
         try:
             with open('globalbans.json', 'r') as f:
                 return json.load(f)
@@ -20,6 +19,7 @@ class GlobalBanCog(commands.Cog):
             return {}
 
     def savebans(self):
+        """Save the global bans to a JSON file."""
         with open('globalbans.json', 'w') as f:
             json.dump(self.globalbans, f, indent=4)
 
@@ -154,4 +154,4 @@ class GlobalBanCog(commands.Cog):
             await interaction.response.send_message(f"Escalated to Cybersecurity.", ephemeral=True)
 
 def setup(bot):
-    bot.add_cog(GlobalBanCog(bot))
+    bot.add_cog(GlobalBan(bot))
