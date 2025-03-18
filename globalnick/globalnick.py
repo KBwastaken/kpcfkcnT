@@ -46,7 +46,3 @@ class GlobalNick(commands.Cog):
             await ctx.send("An error occurred while trying to change the nickname.")
         else:
             raise error
-
-
-def setup(bot):
-    bot.add_cog(GlobalNick(bot))
