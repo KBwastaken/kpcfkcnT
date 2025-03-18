@@ -1,8 +1,7 @@
 import discord
 from redbot.core import commands
-from redbot.core import checks
-from redbot.core.bot import Red
 from discord.ext import commands
+from redbot.core.bot import Red
 
 class GlobalNick(commands.Cog):
     """A cog that allows administrators to change the global nickname of a user."""
@@ -39,7 +38,3 @@ class GlobalNick(commands.Cog):
             await ctx.send(f"An error occurred while executing the command: {error}")
         else:
             await ctx.send(f"Unexpected error: {error}")
-
-# The setup function that Redbot needs to load the cog.
-def setup(bot: Red):
-    bot.add_cog(GlobalNick(bot))
