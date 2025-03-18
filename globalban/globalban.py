@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord.ui import Button, View
 import json
 
-class GlobalBan(commands.Cog):
+class GlobalBan(commands.Cog):  # This line ensures it inherits from commands.Cog
     def __init__(self, bot):
         self.bot = bot
         self.globalbans = self.loadbans()  # Load any pre-existing global bans
