@@ -39,3 +39,7 @@ class GlobalNick(commands.Cog):
             await ctx.send(f"An error occurred while executing the command: {error}")
         else:
             await ctx.send(f"Unexpected error: {error}")
+
+# The setup function that Redbot needs to load the cog.
+def setup(bot: Red):
+    bot.add_cog(GlobalNick(bot))
