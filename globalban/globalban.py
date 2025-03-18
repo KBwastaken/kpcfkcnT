@@ -9,15 +9,15 @@ class GlobalBan(commands.Cog):
     def __init__(self, bot: Red):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890, force_registration=True)
-        self.config.register_guild(globalbans={}, allowed_role=None, log_channels={})
+        self.config.register_global(globalbans={}, log_channel=None)
+        self.config.register_guild(allowed_role=None)
     
     @commands.command()
     @commands.guild_only()
     @commands.admin_or_permissions(ban_members=True)
     async def globalban(self, ctx, member: discord.Member, *, reason: str):
         """Globally ban a user from all affiliated servers."""
-        guild = ctx.guild
-        globalbans = await self.config.guild(guild).globalbans()
+        globalbans = await self.config.globalbans()
         
         if str(member.id) in globalbans:
             return await ctx.send(f"{member.mention} is already globally banned.")
@@ -25,35 +25,36 @@ class GlobalBan(commands.Cog):
         globalbans[str(member.id)] = {
             "username": str(member),
             "userid": member.id,
-            "server": guild.name,
+            "server": ctx.guild.name,
             "executor": str(ctx.author),
             "executor_id": ctx.author.id,
             "reason": reason
         }
         
-        await self.config.guild(guild).globalbans.set(globalbans)
+        await self.config.globalbans.set(globalbans)
+        await member.ban(reason=f"Globally banned: {reason}")
 
         embed = discord.Embed(title="Global Ban Issued", color=discord.Color.red())
         embed.add_field(name="Member", value=f"{member} ({member.id})", inline=False)
-        embed.add_field(name="Server", value=guild.name, inline=True)
+        embed.add_field(name="Server", value=ctx.guild.name, inline=True)
         embed.add_field(name="Executor", value=f"{ctx.author} ({ctx.author.id})", inline=True)
         embed.add_field(name="Reason", value=reason, inline=False)
         embed.set_footer(text="KCN Network API | Global Ban")
         
         view = BanApprovalView(member.id, ctx)
-        await ctx.send(embed=embed, view=view)
-        
-        log_channels = await self.config.log_channels()
-        if str(guild.id) in log_channels:
-            log_channel = self.bot.get_channel(log_channels[str(guild.id)])
+        log_channel_id = await self.config.log_channel()
+        if log_channel_id:
+            log_channel = self.bot.get_channel(log_channel_id)
             if log_channel:
                 await log_channel.send(embed=embed, view=view)
+        else:
+            await ctx.send(embed=embed, view=view)
     
     @commands.command()
     @commands.guild_only()
     async def globalbanlist(self, ctx):
         """Displays the list of globally banned users."""
-        globalbans = await self.config.guild(ctx.guild).globalbans()
+        globalbans = await self.config.globalbans()
         
         if not globalbans:
             return await ctx.send("No users are globally banned.")
@@ -72,19 +73,34 @@ class GlobalBan(commands.Cog):
         await ctx.send(f"Role {role.mention} is now allowed to use globalban commands.")
 
     @commands.command()
-    @commands.guild_only()
-    async def globalbansync(self, ctx):
-        """Sync global bans across all affiliated servers."""
-        await ctx.send("Global bans synced successfully.")
-
-    @commands.command()
     @commands.is_owner()
-    async def globalbanset(self, ctx, guild_id: int, channel: discord.TextChannel):
-        """Set a log channel for global ban notifications in a specific guild."""
-        log_channels = await self.config.log_channels()
-        log_channels[str(guild_id)] = channel.id
-        await self.config.log_channels.set(log_channels)
-        await ctx.send(f"Log channel for guild {guild_id} set to {channel.mention}.")
+    async def globalbanset(self, ctx, channel: discord.TextChannel):
+        """Set the global logging channel for global ban notifications."""
+        await self.config.log_channel.set(channel.id)
+        await ctx.send(f"Global log channel set to {channel.mention}.")
+    
+    @commands.command()
+    @commands.admin_or_permissions(ban_members=True)
+    async def globalunban(self, ctx, user_id: int):
+        """Unban a globally banned user."""
+        globalbans = await self.config.globalbans()
+        
+        if str(user_id) not in globalbans:
+            return await ctx.send("User is not globally banned.")
+        
+        del globalbans[str(user_id)]
+        await self.config.globalbans.set(globalbans)
+        
+        for guild in self.bot.guilds:
+            try:
+                user = await self.bot.fetch_user(user_id)
+                await guild.unban(user)
+            except discord.NotFound:
+                continue
+            except discord.Forbidden:
+                continue
+
+        await ctx.send(f"User {user_id} has been globally unbanned.")
 
 class BanApprovalView(View):
     def __init__(self, user_id: int, ctx):
