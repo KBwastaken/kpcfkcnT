@@ -26,14 +26,20 @@ class GlobalNick(commands.Cog):
             # Ensure the bot has the necessary permissions
             member = guild.get_member(user.id)
             if member is not None:
-                try:
-                    # Change the user's nickname globally
-                    await member.edit(nick=nickname)
-                    await ctx.send(f"Successfully changed the nickname of {user} to `{nickname}` in {guild.name}.")
-                except discord.Forbidden:
-                    await ctx.send(f"Could not change nickname for {user} in {guild.name}, missing permissions.")
-                except discord.HTTPException as e:
-                    await ctx.send(f"Failed to change nickname for {user} in {guild.name}: {e}")
+                bot_member = guild.get_member(self.bot.user.id)
+
+                # Check if bot has the "Manage Nicknames" permission in the server
+                if bot_member and bot_member.guild_permissions.manage_nicknames:
+                    try:
+                        # Change the user's nickname globally
+                        await member.edit(nick=nickname)
+                        await ctx.send(f"Successfully changed the nickname of {user} to `{nickname}` in {guild.name}.")
+                    except discord.Forbidden:
+                        await ctx.send(f"Could not change nickname for {user} in {guild.name}, missing permissions.")
+                    except discord.HTTPException as e:
+                        await ctx.send(f"Failed to change nickname for {user} in {guild.name}: {e}")
+                else:
+                    await ctx.send(f"Bot does not have the 'Manage Nicknames' permission in {guild.name}.")
             else:
                 await ctx.send(f"{user} is not a member of {guild.name}.")
 
