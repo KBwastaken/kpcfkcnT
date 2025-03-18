@@ -1,4 +1,4 @@
 from .globalnick import GlobalNick
 
-def setup(bot):
-    bot.add_cog(GlobalNick(bot))
+async def setup(bot):
+    await bot.add_cog(GlobalNick(bot))
