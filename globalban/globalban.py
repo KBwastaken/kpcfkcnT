@@ -13,18 +13,17 @@ class GlobalBan(commands.Cog):
         self.config.register_guild(allowed_role=None)
     
     @commands.command()
-    @commands.guild_only()
     @commands.admin_or_permissions(ban_members=True)
-    async def globalban(self, ctx, member: discord.Member, *, reason: str):
+    async def globalban(self, ctx, user: discord.User, *, reason: str):
         """Globally ban a user from all affiliated servers."""
         globalbans = await self.config.globalbans()
         
-        if str(member.id) in globalbans:
-            return await ctx.send(f"{member.mention} is already globally banned.")
+        if str(user.id) in globalbans:
+            return await ctx.send(f"{user.mention} is already globally banned.")
 
-        globalbans[str(member.id)] = {
-            "username": str(member),
-            "userid": member.id,
+        globalbans[str(user.id)] = {
+            "username": str(user),
+            "userid": user.id,
             "server": ctx.guild.name,
             "executor": str(ctx.author),
             "executor_id": ctx.author.id,
@@ -32,16 +31,23 @@ class GlobalBan(commands.Cog):
         }
         
         await self.config.globalbans.set(globalbans)
-        await member.ban(reason=f"Globally banned: {reason}")
+        
+        for guild in self.bot.guilds:
+            try:
+                await guild.ban(user, reason=f"Globally banned: {reason}")
+            except discord.Forbidden:
+                continue
+            except discord.NotFound:
+                continue
 
         embed = discord.Embed(title="Global Ban Issued", color=discord.Color.red())
-        embed.add_field(name="Member", value=f"{member} ({member.id})", inline=False)
+        embed.add_field(name="Member", value=f"{user} ({user.id})", inline=False)
         embed.add_field(name="Server", value=ctx.guild.name, inline=True)
         embed.add_field(name="Executor", value=f"{ctx.author} ({ctx.author.id})", inline=True)
         embed.add_field(name="Reason", value=reason, inline=False)
         embed.set_footer(text="KCN Network API | Global Ban")
         
-        view = BanApprovalView(member.id, ctx)
+        view = BanApprovalView(user.id, ctx)
         log_channel_id = await self.config.log_channel()
         if log_channel_id:
             log_channel = self.bot.get_channel(log_channel_id)
@@ -51,33 +57,20 @@ class GlobalBan(commands.Cog):
             await ctx.send(embed=embed, view=view)
     
     @commands.command()
-    @commands.guild_only()
-    async def globalbanlist(self, ctx):
-        """Displays the list of globally banned users."""
+    @commands.is_owner()
+    async def globalbansync(self, ctx):
+        """Sync global bans across all servers."""
         globalbans = await self.config.globalbans()
-        
-        if not globalbans:
-            return await ctx.send("No users are globally banned.")
-        
-        embed = discord.Embed(title="Global Ban List", color=discord.Color.orange())
-        for user_id, data in globalbans.items():
-            embed.add_field(name=f"{data['username']} ({user_id})", value=f"Reason: {data['reason']}", inline=False)
-        
-        await ctx.send(embed=embed)
-    
-    @commands.command()
-    @commands.is_owner()
-    async def globalbanallow(self, ctx, role: discord.Role):
-        """Set a role that is allowed to globally ban users."""
-        await self.config.guild(ctx.guild).allowed_role.set(role.id)
-        await ctx.send(f"Role {role.mention} is now allowed to use globalban commands.")
-
-    @commands.command()
-    @commands.is_owner()
-    async def globalbanset(self, ctx, channel: discord.TextChannel):
-        """Set the global logging channel for global ban notifications."""
-        await self.config.log_channel.set(channel.id)
-        await ctx.send(f"Global log channel set to {channel.mention}.")
+        for user_id in globalbans.keys():
+            user = await self.bot.fetch_user(int(user_id))
+            for guild in self.bot.guilds:
+                try:
+                    await guild.ban(user, reason="Global ban sync")
+                except discord.Forbidden:
+                    continue
+                except discord.NotFound:
+                    continue
+        await ctx.send("Global bans have been synced across all servers.")
     
     @commands.command()
     @commands.admin_or_permissions(ban_members=True)
@@ -108,13 +101,13 @@ class BanApprovalView(View):
         self.user_id = user_id
         self.ctx = ctx
 
-        self.approve_button = Button(label="Approve", style=discord.ButtonStyle.green)
+        self.approve_button = Button(label="Approve", style=discord.ButtonStyle.green, disabled=False)
         self.approve_button.callback = self.approve
         
-        self.deny_button = Button(label="Deny", style=discord.ButtonStyle.red)
+        self.deny_button = Button(label="Deny", style=discord.ButtonStyle.red, disabled=False)
         self.deny_button.callback = self.deny
         
-        self.escalate_button = Button(label="Escalate to Cybersecurity", style=discord.ButtonStyle.blurple)
+        self.escalate_button = Button(label="Escalate to Cybersecurity", style=discord.ButtonStyle.blurple, disabled=False)
         self.escalate_button.callback = self.escalate
         
         self.add_item(self.approve_button)
@@ -122,10 +115,23 @@ class BanApprovalView(View):
         self.add_item(self.escalate_button)
     
     async def approve(self, interaction: discord.Interaction):
-        await interaction.response.edit_message(content=f"Approved by {interaction.user.mention}", view=None)
+        self.approve_button.disabled = True
+        self.deny_button.disabled = True
+        await interaction.response.edit_message(content=f"Approved by {interaction.user.mention}", view=self)
     
     async def deny(self, interaction: discord.Interaction):
-        await interaction.response.edit_message(content=f"Unbanned {self.user_id} | Denied by {interaction.user.mention}", view=None)
+        self.approve_button.disabled = True
+        self.deny_button.disabled = True
+        for guild in self.ctx.bot.guilds:
+            try:
+                user = await self.ctx.bot.fetch_user(self.user_id)
+                await guild.unban(user)
+            except discord.NotFound:
+                continue
+            except discord.Forbidden:
+                continue
+        await interaction.response.edit_message(content=f"Unbanned {self.user_id} | Denied by {interaction.user.mention}", view=self)
     
     async def escalate(self, interaction: discord.Interaction):
+        self.escalate_button.disabled = True
         await interaction.response.edit_message(content=f"Escalated to Cybersecurity by {interaction.user.mention}", view=self)
