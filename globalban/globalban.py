@@ -42,6 +42,12 @@ class GlobalBan(commands.Cog):
         
         view = BanApprovalView(member.id, ctx)
         await ctx.send(embed=embed, view=view)
+        
+        log_channels = await self.config.log_channels()
+        if str(guild.id) in log_channels:
+            log_channel = self.bot.get_channel(log_channels[str(guild.id)])
+            if log_channel:
+                await log_channel.send(embed=embed, view=view)
     
     @commands.command()
     @commands.guild_only()
