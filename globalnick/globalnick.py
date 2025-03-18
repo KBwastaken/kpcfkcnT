@@ -38,3 +38,4 @@ class GlobalNick(commands.Cog):
             await ctx.send(f"An error occurred while executing the command: {error}")
         else:
             await ctx.send(f"Unexpected error: {error}")
+
