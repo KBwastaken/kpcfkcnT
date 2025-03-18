@@ -1,4 +1,4 @@
-from .globalban import GlobalBan
+from .globalban_cog import GlobalBanCog
 
 async def setup(bot):
-    await bot.add_cog(GlobalBan(bot))
+    await bot.add_cog(GlobalBanCog(bot))
