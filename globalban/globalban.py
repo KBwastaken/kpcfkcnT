@@ -61,11 +61,11 @@ class GlobalBan(commands.Cog):
     async def globalbansync(self, ctx):
         """Sync global bans across all servers."""
         globalbans = await self.config.globalbans()
-        for user_id in globalbans.keys():
+        for user_id, ban_data in globalbans.items():
             user = await self.bot.fetch_user(int(user_id))
             for guild in self.bot.guilds:
                 try:
-                    await guild.ban(user, reason="Global ban sync")
+                    await guild.ban(user, reason=f"Global ban sync: {ban_data['reason']}")
                 except discord.Forbidden:
                     continue
                 except discord.NotFound:
@@ -122,6 +122,12 @@ class BanApprovalView(View):
     async def deny(self, interaction: discord.Interaction):
         self.approve_button.disabled = True
         self.deny_button.disabled = True
+        globalbans = await self.ctx.cog.config.globalbans()
+        
+        if str(self.user_id) in globalbans:
+            del globalbans[str(self.user_id)]
+            await self.ctx.cog.config.globalbans.set(globalbans)
+        
         for guild in self.ctx.bot.guilds:
             try:
                 user = await self.ctx.bot.fetch_user(self.user_id)
@@ -130,6 +136,7 @@ class BanApprovalView(View):
                 continue
             except discord.Forbidden:
                 continue
+        
         await interaction.response.edit_message(content=f"Unbanned {self.user_id} | Denied by {interaction.user.mention}", view=self)
     
     async def escalate(self, interaction: discord.Interaction):
