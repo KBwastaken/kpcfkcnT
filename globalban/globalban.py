@@ -9,7 +9,7 @@ class GlobalBan(commands.Cog):
     def __init__(self, bot: Red):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890, force_registration=True)
-        self.config.register_guild(globalbans={}, allowed_role=None)
+        self.config.register_guild(globalbans={}, allowed_role=None, log_channels={})
     
     @commands.command()
     @commands.guild_only()
@@ -59,8 +59,7 @@ class GlobalBan(commands.Cog):
         await ctx.send(embed=embed)
     
     @commands.command()
-    @commands.guild_only()
-    @commands.admin_or_permissions(administrator=True)
+    @commands.is_owner()
     async def globalbanallow(self, ctx, role: discord.Role):
         """Set a role that is allowed to globally ban users."""
         await self.config.guild(ctx.guild).allowed_role.set(role.id)
@@ -71,6 +70,15 @@ class GlobalBan(commands.Cog):
     async def globalbansync(self, ctx):
         """Sync global bans across all affiliated servers."""
         await ctx.send("Global bans synced successfully.")
+
+    @commands.command()
+    @commands.is_owner()
+    async def globalbanset(self, ctx, guild_id: int, channel: discord.TextChannel):
+        """Set a log channel for global ban notifications in a specific guild."""
+        log_channels = await self.config.log_channels()
+        log_channels[str(guild_id)] = channel.id
+        await self.config.log_channels.set(log_channels)
+        await ctx.send(f"Log channel for guild {guild_id} set to {channel.mention}.")
 
 class BanApprovalView(View):
     def __init__(self, user_id: int, ctx):
