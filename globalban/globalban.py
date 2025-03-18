@@ -152,6 +152,3 @@ class GlobalBan(commands.Cog):  # Inheriting from commands.Cog
             # Handle escalation
             await interaction.message.edit(view=None)
             await interaction.response.send_message(f"Escalated to Cybersecurity.", ephemeral=True)
-
-def setup(bot):
-    bot.add_cog(GlobalBan(bot))
