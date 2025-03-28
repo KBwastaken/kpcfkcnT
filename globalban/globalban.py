@@ -183,7 +183,7 @@ class GlobalBan(commands.Cog):
             
             # Prepare the content for sending in chunks
             data_str = "\n".join([str(user_id) for user_id in data])
-            chunk_size = 2000  # Discord's character limit for messages
+            chunk_size = 1500  # Discord's character limit for messages
             for i in range(0, len(data_str), chunk_size):
                 await ctx.author.send(f"Global Ban List (Part {i//chunk_size + 1}):\n{data_str[i:i+chunk_size]}")
             
