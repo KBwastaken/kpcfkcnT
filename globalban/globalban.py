@@ -172,6 +172,7 @@ class GlobalBan(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def globalbanlist(self, ctx):
+        """Sends the global ban list to the user's DMs, splitting into chunks if necessary."""
         if not os.path.exists("globalbans.yaml"):
             with open("globalbans.yaml", "w") as file:
                 yaml.dump([], file)
@@ -180,10 +181,11 @@ class GlobalBan(commands.Cog):
             with open("globalbans.yaml", "r") as file:
                 data = yaml.safe_load(file) or []  # Safely load the content if file is not empty
             
-            # Send the ban list in chunks
+            # Prepare the content for sending in chunks
+            data_str = "\n".join([str(user_id) for user_id in data])
             chunk_size = 2000  # Discord's character limit for messages
-            for i in range(0, len(str(data)), chunk_size):
-                await ctx.author.send(f"Global Ban List: {data[i:i+chunk_size]}")
+            for i in range(0, len(data_str), chunk_size):
+                await ctx.author.send(f"Global Ban List (Part {i//chunk_size + 1}):\n{data_str[i:i+chunk_size]}")
             
             await ctx.send("Global ban list sent to your DMs.")
         except Exception as e:
