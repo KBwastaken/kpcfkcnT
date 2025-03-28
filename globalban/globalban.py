@@ -28,7 +28,8 @@ class GlobalBan(commands.Cog):
         banned_users = await self.config.banned_users()
         for guild in self.bot.guilds:
             try:
-                async for ban_entry in guild.bans():
+                bans = await guild.bans()
+                for ban_entry in bans:
                     if ban_entry.user.id not in banned_users:
                         banned_users.append(ban_entry.user.id)
                         await asyncio.sleep(1)  # Prevent rate limits
@@ -88,7 +89,8 @@ class GlobalBan(commands.Cog):
         banned_users = []
         for guild in self.bot.guilds:
             try:
-                async for ban_entry in guild.bans():
+                bans = await guild.bans()
+                for ban_entry in bans:
                     if ban_entry.user.id not in banned_users:
                         banned_users.append(ban_entry.user.id)
                         await asyncio.sleep(1)  # Prevent rate limits
