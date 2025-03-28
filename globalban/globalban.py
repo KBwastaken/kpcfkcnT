@@ -3,8 +3,11 @@ import discord
 import yaml
 import asyncio
 import os
+import logging
 from redbot.core import commands, Config, checks
 from redbot.core.bot import Red
+
+log = logging.getLogger("red.GlobalBan")
 
 class GlobalBan(commands.Cog):
     """A cog for global banning users across all servers the bot is in."""
@@ -25,6 +28,7 @@ class GlobalBan(commands.Cog):
                 await owner.send("Global ban list checked and updated.")
 
     async def sync_bans(self):
+        log.info("Starting ban sync...")
         banned_users = await self.config.banned_users()
         for guild in self.bot.guilds:
             try:
@@ -33,7 +37,9 @@ class GlobalBan(commands.Cog):
                         banned_users.append(ban_entry.user.id)
                         await asyncio.sleep(1)  # Prevent rate limits
                 await self.config.banned_users.set(banned_users)
-            except discord.HTTPException:
+                log.info(f"Synced bans from guild: {guild.name}")
+            except discord.HTTPException as e:
+                log.error(f"Error fetching bans from {guild.name}: {e}")
                 continue
         
         for user_id in banned_users:
@@ -42,7 +48,9 @@ class GlobalBan(commands.Cog):
                     await guild.ban(discord.Object(id=user_id), reason="Global ban enforced.")
                     await asyncio.sleep(1)  # Prevent rate limits
                 except discord.Forbidden:
+                    log.warning(f"No permission to ban in {guild.name}")
                     continue
+        log.info("Ban sync completed.")
 
     @commands.command()
     @commands.is_owner()
@@ -79,12 +87,14 @@ class GlobalBan(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def bansync(self, ctx):
+        log.info("Manual ban sync initiated.")
         await self.sync_bans()
         await ctx.send("Global bans synced.")
 
     @commands.command()
     @commands.is_owner()
     async def globalbanupdatelist(self, ctx):
+        log.info("Updating global ban list...")
         banned_users = []
         for guild in self.bot.guilds:
             try:
@@ -92,7 +102,9 @@ class GlobalBan(commands.Cog):
                     if ban_entry.user.id not in banned_users:
                         banned_users.append(ban_entry.user.id)
                         await asyncio.sleep(1)  # Prevent rate limits
-            except discord.HTTPException:
+                log.info(f"Fetched bans from {guild.name}")
+            except discord.HTTPException as e:
+                log.error(f"Error fetching bans from {guild.name}: {e}")
                 continue
         await self.config.banned_users.set(banned_users)
         with open("globalbans.yaml", "w") as file:
