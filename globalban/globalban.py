@@ -73,12 +73,28 @@ class GlobalBan(commands.Cog):
 
     async def load_globalban_list(self):
         """Load the global ban list from the YAML file."""
+        file_path = "globalbans.yaml"
+        
+        # If the file doesn't exist, create an empty list and return
+        if not os.path.exists(file_path):
+            log.warning(f"{file_path} not found. Creating a new file.")
+            return []
+
         try:
-            with open("globalbans.yaml", "r") as file:
+            with open(file_path, "r") as file:
                 return yaml.safe_load(file) or []
         except Exception as e:
             log.error(f"Error reading global ban list: {e}")
             return []
+
+    async def save_globalban_list(self, global_ban_list):
+        """Save the global ban list to the YAML file."""
+        try:
+            with open("globalbans.yaml", "w") as file:
+                yaml.dump(global_ban_list, file)
+            log.info("Global ban list saved successfully.")
+        except Exception as e:
+            log.error(f"Error saving the global ban list: {e}")
 
     @commands.command()
     @commands.is_owner()
@@ -168,21 +184,15 @@ class GlobalBan(commands.Cog):
                 log.info(f"Added new ban for user {user_id}: {reason} (Banned by {banned_by})")
 
         # Save the updated list to the YAML file
-        try:
-            with open("globalbans.yaml", "w") as file:
-                yaml.dump(updated_bans, file)
-            log.info("Global ban list updated successfully.")
-        except Exception as e:
-            log.error(f"Error updating the global ban list: {e}")
-            await ctx.send("Error updating the global ban list.")
+        await self.save_globalban_list(updated_bans)
+        await ctx.send("Global ban list updated successfully.")
 
     @commands.command()
     @commands.is_owner()
     async def globalbanlist(self, ctx):
         """Show the global ban list."""
         try:
-            with open("globalbans.yaml", "r") as file:
-                global_ban_list = yaml.safe_load(file) or []
+            global_ban_list = await self.load_globalban_list()
             
             log.info(f"Loaded global ban list with {len(global_ban_list)} entries.")
             
@@ -225,8 +235,7 @@ class GlobalBan(commands.Cog):
     async def globaltotalbans(self, ctx):
         """Show the total number of global bans."""
         try:
-            with open("globalbans.yaml", "r") as file:
-                global_ban_list = yaml.safe_load(file) or []
+            global_ban_list = await self.load_globalban_list()
             total_bans = len(global_ban_list)
             log.info(f"Total number of global bans: {total_bans}")
             await ctx.send(f"Total number of global bans: {total_bans}")
