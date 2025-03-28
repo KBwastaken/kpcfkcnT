@@ -31,10 +31,14 @@ class GlobalBan(commands.Cog):
         banned_users = await self.config.banned_users()
         for guild in self.bot.guilds:
             try:
+                count = 0
                 async for ban_entry in guild.bans():
                     if ban_entry.user.id not in banned_users:
                         banned_users.append(ban_entry.user.id)
+                        count += 1
                         await asyncio.sleep(1)  # Prevent rate limits
+                        if count % 5 == 0:  # Log every 5 bans
+                            log.info(f"Still fetching bans from {guild.name}... {count} bans added so far.")
                 await self.config.banned_users.set(banned_users)
                 log.info(f"Synced bans from guild: {guild.name}")
             except discord.HTTPException as e:
@@ -49,6 +53,7 @@ class GlobalBan(commands.Cog):
                 except discord.Forbidden:
                     log.warning(f"No permission to ban in {guild.name}")
                     continue
+                log.info(f"Still banning users... {user_id} banned.")
         log.info("Ban sync completed.")
 
     @commands.command()
@@ -104,10 +109,14 @@ class GlobalBan(commands.Cog):
         log.info(f"Fetching bans from the server: {guild.name}")
         
         try:
+            count = 0
             async for ban_entry in guild.bans():
                 if ban_entry.user.id not in banned_users:
                     banned_users.append(ban_entry.user.id)
+                    count += 1
                     await asyncio.sleep(1)  # Prevent rate limits
+                    if count % 5 == 0:  # Log every 5 bans
+                        log.info(f"Still fetching bans... {count} users added so far.")
             log.info(f"Fetched {len(banned_users)} bans from {guild.name}")
         except discord.HTTPException as e:
             log.error(f"Error fetching bans from {guild.name}: {e}")
