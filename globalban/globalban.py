@@ -168,6 +168,12 @@ class GlobalBan(commands.Cog):
                 with open("globalbans.yaml", "r") as file:
                     # Safely load content and make sure it's a list of dictionaries
                     data = yaml.safe_load(file) or []
+
+                    # If the data contains only IDs (int values), convert to dicts
+                    if all(isinstance(entry, int) for entry in data):
+                        # Transform list of IDs into a list of dictionaries with default values
+                        data = [{'user_id': entry, 'reason': 'No reason provided', 'banned_by': 'Unknown'} for entry in data]
+
                     if isinstance(data, list):
                         # Ensure each entry is a dictionary with required fields
                         valid_data = []
@@ -213,11 +219,8 @@ class GlobalBan(commands.Cog):
     async def remove_from_globalban_list(self, user_id):
         """Removes a user from the global ban list."""
         global_ban_list = await self.load_globalban_list()
-
-        # Remove the entry from the list
         global_ban_list = [entry for entry in global_ban_list if entry['user_id'] != user_id]
 
-        # Save to the YAML file
         try:
             with open("globalbans.yaml", "w") as file:
                 yaml.dump(global_ban_list, file)
