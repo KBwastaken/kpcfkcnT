@@ -30,24 +30,41 @@ class GlobalBan(commands.Cog):
 
     async def sync_bans(self):
         banned_users = await self.config.banned_users()
+        total_bans = 0
+        total_servers = len(self.bot.guilds)
+        server_counter = 0
+
+        # Loop over all guilds
         for guild in self.bot.guilds:
+            server_counter += 1
+            # Track how many bans we fetched from this server
+            fetched_bans = 0
             try:
-                # Sync bans from all guilds to the global list
                 async for ban_entry in guild.bans():
+                    # Add bans to the global list if not already present
                     if ban_entry.user.id not in banned_users:
                         banned_users.append(ban_entry.user.id)
-                        await asyncio.sleep(1)  # Prevent rate limits
-                await self.config.banned_users.set(banned_users)
+                        fetched_bans += 1
+                    # Log every 5 bans fetched from this server
+                    if fetched_bans % 5 == 0:
+                        await self.bot.get_channel(ctx.channel.id).send(f"Fetching from {guild.name}: {fetched_bans} bans fetched so far.")
+                
+                # After finishing a server, log that the server's bans are done
+                await self.bot.get_channel(ctx.channel.id).send(f"Finished fetching bans from {guild.name}. {fetched_bans} bans fetched.")
+                total_bans += fetched_bans
+
             except discord.HTTPException:
                 continue
+
+        # Update global banned users list after processing all servers
+        await self.config.banned_users.set(banned_users)
         
-        for user_id in banned_users:
-            for guild in self.bot.guilds:
-                try:
-                    await guild.ban(discord.Object(id=user_id), reason="Global ban enforced.")
-                    await asyncio.sleep(1)  # Prevent rate limits
-                except discord.Forbidden:
-                    continue
+        # Write to the YAML file after updating
+        with open("globalbans.yaml", "w") as file:
+            yaml.dump(banned_users, file)
+        
+        # Log when all bans have been fetched from all servers
+        await self.bot.get_channel(ctx.channel.id).send(f"All bans fetched. List updated with {total_bans} bans.")
 
     @commands.command()
     @commands.is_owner()
