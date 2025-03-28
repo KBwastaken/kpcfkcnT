@@ -175,14 +175,45 @@ class GlobalBan(commands.Cog):
         if not os.path.exists("globalbans.yaml"):
             with open("globalbans.yaml", "w") as file:
                 yaml.dump([], file)
+        
         try:
             with open("globalbans.yaml", "r") as file:
                 data = yaml.safe_load(file) or []  # Safely load the content if file is not empty
-            await ctx.author.send(f"Global Ban List: {data}")
+            
+            # Send the ban list in chunks
+            chunk_size = 2000  # Discord's character limit for messages
+            for i in range(0, len(str(data)), chunk_size):
+                await ctx.author.send(f"Global Ban List: {data[i:i+chunk_size]}")
+            
             await ctx.send("Global ban list sent to your DMs.")
         except Exception as e:
             log.error(f"Error reading the global ban list: {e}")
             await ctx.send("An error occurred while reading the global ban list.")
+
+    @commands.command()
+    @commands.is_owner()
+    async def globalbanlistwipe(self, ctx):
+        """Wipes the global ban list after reaction confirmation."""
+        confirm_msg = await ctx.send("Are you sure you want to wipe the global ban list? React with ✅ to confirm.")
+        
+        # Add the confirmation reaction
+        await confirm_msg.add_reaction("✅")
+        
+        def check(reaction, user):
+            return user == ctx.author and str(reaction.emoji) == "✅" and reaction.message.id == confirm_msg.id
+        
+        try:
+            await self.bot.wait_for('reaction_add', check=check, timeout=60)
+            # Proceed to wipe the list
+            with open("globalbans.yaml", "w") as file:
+                yaml.dump([], file)
+            await self.config.banned_users.set([])
+            await ctx.send("Global ban list has been wiped.")
+        except asyncio.TimeoutError:
+            await ctx.send("No confirmation received. Wipe cancelled.")
+        except Exception as e:
+            log.error(f"Error wiping the global ban list: {e}")
+            await ctx.send("An error occurred while wiping the global ban list.")
 
     async def load_globalban_list(self):
         """Helper function to load global ban list from YAML."""
