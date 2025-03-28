@@ -2,7 +2,7 @@ import discord
 import yaml
 import asyncio
 import os
-from redbot.core import commands, Config, checks
+from redbot.core import commands, Config
 from redbot.core.bot import Red
 import logging
 
@@ -94,19 +94,46 @@ class GlobalBan(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def globalbanupdatelist(self, ctx):
-        banned_users = []
-        for guild in self.bot.guilds:
-            try:
-                async for ban_entry in guild.bans():
-                    if ban_entry.user.id not in banned_users:
-                        banned_users.append(ban_entry.user.id)
-                        await asyncio.sleep(1)  # Prevent rate limits
-            except discord.HTTPException:
-                continue
-        await self.config.banned_users.set(banned_users)
-        with open("globalbans.yaml", "w") as file:
-            yaml.dump(banned_users, file)
-        await ctx.send("Global ban list updated.")
+        """Update the global ban list from the server where the command is issued."""
+        
+        # Initialize the global ban list
+        global_ban_list = await self.load_globalban_list()
+
+        # Start the update
+        log.info(f"Starting global ban list update in server: {ctx.guild.name}")
+
+        updated_bans = []
+        for ban_entry in await ctx.guild.bans():
+            user_id = ban_entry.user.id
+            reason = ban_entry.reason if ban_entry.reason else "No reason provided"
+            banned_by = ban_entry.user.name if ban_entry.user else "Unknown"
+            
+            # Check if the user is already in the global ban list
+            existing_entry = next((entry for entry in global_ban_list if entry['user_id'] == user_id), None)
+
+            if existing_entry:
+                # If the user is already in the list, update their reason and the banning user
+                existing_entry['reason'] = reason
+                existing_entry['banned_by'] = banned_by
+                updated_bans.append(existing_entry)
+                log.info(f"Updated ban for user {user_id}: {reason} (Banned by {banned_by})")
+            else:
+                # If the user is not in the list, add a new entry
+                updated_bans.append({
+                    'user_id': user_id,
+                    'reason': reason,
+                    'banned_by': banned_by
+                })
+                log.info(f"Added new ban for user {user_id}: {reason} (Banned by {banned_by})")
+
+        # Save the updated list to the YAML file
+        try:
+            with open("globalbans.yaml", "w") as file:
+                yaml.dump(updated_bans, file)
+            log.info("Global ban list updated successfully.")
+        except Exception as e:
+            log.error(f"Error updating the global ban list: {e}")
+            await ctx.send("Error updating the global ban list.")
 
     @commands.command()
     @commands.is_owner()
@@ -217,10 +244,13 @@ class GlobalBan(commands.Cog):
             log.error(f"Error adding to the global ban list: {e}")
 
     async def remove_from_globalban_list(self, user_id):
-        """Removes a user from the global ban list."""
+        """Removes the user from the global ban list."""
         global_ban_list = await self.load_globalban_list()
+
+        # Remove the user from the list
         global_ban_list = [entry for entry in global_ban_list if entry['user_id'] != user_id]
 
+        # Save to the YAML file
         try:
             with open("globalbans.yaml", "w") as file:
                 yaml.dump(global_ban_list, file)
