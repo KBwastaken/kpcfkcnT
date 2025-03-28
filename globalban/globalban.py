@@ -169,7 +169,14 @@ class GlobalBan(commands.Cog):
                     # Safely load content and make sure it's a list of dictionaries
                     data = yaml.safe_load(file) or []
                     if isinstance(data, list):
-                        return data
+                        # Ensure each entry is a dictionary with required fields
+                        valid_data = []
+                        for entry in data:
+                            if isinstance(entry, dict) and 'user_id' in entry and 'reason' in entry and 'banned_by' in entry:
+                                valid_data.append(entry)
+                            else:
+                                log.warning(f"Skipping invalid entry: {entry}")
+                        return valid_data
                     else:
                         log.error("Loaded data from globalbans.yaml is not a list. Resetting file.")
                         return []  # Reset to empty list if structure is invalid
