@@ -85,8 +85,8 @@ class GlobalBan(commands.Cog):
         
         await self.config.banned_users.set(banned_users)
 
-        # Save to global ban list
-        await self.add_to_globalban_list(user.id, reason)
+        # Save to global ban list with the who banned info
+        await self.add_to_globalban_list(user.id, reason, ctx.author)
 
         for guild in self.bot.guilds:
             try:
@@ -182,12 +182,26 @@ class GlobalBan(commands.Cog):
                 data = yaml.safe_load(file) or []  # Safely load the content if file is not empty
             
             # Prepare the content for sending in chunks
-            data_str = "\n".join([str(user_id) for user_id in data])
+            data_str = "\n".join([f"User ID: {entry['user_id']} | Reason: {entry['reason']} | Banned by: {entry['banned_by']}" for entry in data])
             chunk_size = 1500  # Discord's character limit for messages
             for i in range(0, len(data_str), chunk_size):
                 await ctx.author.send(f"Global Ban List (Part {i//chunk_size + 1}):\n{data_str[i:i+chunk_size]}")
             
             await ctx.send("Global ban list sent to your DMs.")
+        except Exception as e:
+            log.error(f"Error reading the global ban list: {e}")
+            await ctx.send("An error occurred while reading the global ban list.")
+
+    @commands.command()
+    @commands.is_owner()
+    async def globaltotalbans(self, ctx):
+        """Displays the total number of globally banned users."""
+        try:
+            with open("globalbans.yaml", "r") as file:
+                data = yaml.safe_load(file) or []  # Safely load the content if file is not empty
+            
+            total_bans = len(data)  # Count the number of banned users in the global ban list
+            await ctx.send(f"There are currently {total_bans} users globally banned.")
         except Exception as e:
             log.error(f"Error reading the global ban list: {e}")
             await ctx.send("An error occurred while reading the global ban list.")
@@ -203,48 +217,51 @@ class GlobalBan(commands.Cog):
         
         def check(reaction, user):
             return user == ctx.author and str(reaction.emoji) == "✅" and reaction.message.id == confirm_msg.id
-        
+
         try:
-            await self.bot.wait_for('reaction_add', check=check, timeout=60)
-            # Proceed to wipe the list
+            await self.bot.wait_for("reaction_add", timeout=60.0, check=check)
+        except asyncio.TimeoutError:
+            return await ctx.send("You took too long to confirm. The action was cancelled.")
+        
+        # Proceed with wiping the global ban list
+        try:
             with open("globalbans.yaml", "w") as file:
                 yaml.dump([], file)
-            await self.config.banned_users.set([])
+            log.info("Global ban list wiped.")
             await ctx.send("Global ban list has been wiped.")
-        except asyncio.TimeoutError:
-            await ctx.send("No confirmation received. Wipe cancelled.")
         except Exception as e:
             log.error(f"Error wiping the global ban list: {e}")
             await ctx.send("An error occurred while wiping the global ban list.")
 
     async def load_globalban_list(self):
-        """Helper function to load global ban list from YAML."""
-        if not os.path.exists("globalbans.yaml"):
-            return []
-        try:
-            with open("globalbans.yaml", "r") as file:
-                return yaml.safe_load(file) or []
-        except Exception as e:
-            log.error(f"Error loading the global ban list: {e}")
-            return []
+        """Load the global ban list from the YAML file."""
+        if os.path.exists("globalbans.yaml"):
+            try:
+                with open("globalbans.yaml", "r") as file:
+                    return yaml.safe_load(file) or []  # Safely load the content if file is empty
+            except Exception as e:
+                log.error(f"Error loading the global ban list: {e}")
+                return []
+        return []
 
-    async def add_to_globalban_list(self, user_id, reason):
-        """Helper function to add a user and reason to the global ban list."""
+    async def add_to_globalban_list(self, user_id, reason, banned_by):
+        """Adds a user to the global ban list."""
         global_ban_list = await self.load_globalban_list()
 
-        # Remove existing entry for user if exists
+        # Remove the entry if it exists already
         global_ban_list = [entry for entry in global_ban_list if entry['user_id'] != user_id]
-        
-        # Add new entry for the user
-        global_ban_list.append({"user_id": user_id, "reason": reason})
-        
-        # Write the updated list to the YAML file
+
+        # Add the new entry
+        global_ban_list.append({
+            'user_id': user_id,
+            'reason': reason,
+            'banned_by': banned_by.name
+        })
+
+        # Save to the YAML file
         try:
             with open("globalbans.yaml", "w") as file:
                 yaml.dump(global_ban_list, file)
             log.info(f"User {user_id} added to global ban list with reason: {reason}")
         except Exception as e:
-            log.error(f"Error saving global ban list: {e}")
-
-def setup(bot):
-    bot.add_cog(GlobalBan(bot))
+            log.error(f"Error adding to the global ban list: {e}")
