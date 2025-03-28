@@ -1,3 +1,4 @@
+# __init__.py
 from .globalban import GlobalBan
 
 async def setup(bot):
