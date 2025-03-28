@@ -45,6 +45,9 @@ class GlobalBan(commands.Cog):
                 log.error(f"Error fetching bans from {guild.name}: {e}")
                 continue
         
+        # Remove duplicates using a set to ensure no duplicates in the final list
+        banned_users = list(set(banned_users))
+
         for user_id in banned_users:
             for guild in self.bot.guilds:
                 try:
@@ -62,11 +65,32 @@ class GlobalBan(commands.Cog):
         banned_users = await self.config.banned_users()
         if user.id in banned_users:
             return await ctx.send("User is already globally banned.")
+        
+        # Check if there's an existing ban reason
+        global_ban_list = await self.load_globalban_list()
+        existing_reason = None
+        for entry in global_ban_list:
+            if entry['user_id'] == user.id:
+                existing_reason = entry['reason']
+                break
+        
+        # Use the existing reason if found, otherwise use the provided reason
+        if existing_reason:
+            reason = existing_reason
+
         banned_users.append(user.id)
+        
+        # Remove duplicates before saving
+        banned_users = list(set(banned_users))
+        
         await self.config.banned_users.set(banned_users)
+
+        # Save to global ban list
+        await self.add_to_globalban_list(user.id, reason)
+
         for guild in self.bot.guilds:
             try:
-                await guild.ban(user, reason=f"Global Ban: {reason}")
+                await guild.ban(user, reason=reason)
                 await asyncio.sleep(1)  # Prevent rate limits
             except discord.Forbidden:
                 continue
@@ -98,30 +122,41 @@ class GlobalBan(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def globalbanupdatelist(self, ctx):
-        log.info("Updating global ban list from the current server...")
+        log.info("Updating global ban list from multiple servers...")
         banned_users = []
-        
-        guild = ctx.guild  # Get the server where the command was issued
-        if not guild:
-            log.error("No guild found. This command must be run from a server.")
-            return await ctx.send("This command must be run from a server.")
-        
-        log.info(f"Fetching bans from the server: {guild.name}")
-        
-        try:
-            count = 0
-            async for ban_entry in guild.bans():
-                if ban_entry.user.id not in banned_users:
-                    banned_users.append(ban_entry.user.id)
-                    count += 1
-                    await asyncio.sleep(1)  # Prevent rate limits
-                    if count % 5 == 0:  # Log every 5 bans
-                        log.info(f"Still fetching bans... {count} users added so far.")
-            log.info(f"Fetched {len(banned_users)} bans from {guild.name}")
-        except discord.HTTPException as e:
-            log.error(f"Error fetching bans from {guild.name}: {e}")
-            return await ctx.send(f"An error occurred while fetching bans from {guild.name}.")
-        
+
+        # Fetch bans from all servers concurrently
+        async def fetch_bans(guild):
+            log.info(f"Fetching bans from the server: {guild.name}")
+            local_banned_users = []
+            try:
+                count = 0
+                async for ban_entry in guild.bans():
+                    if ban_entry.user.id not in banned_users:
+                        banned_users.append(ban_entry.user.id)
+                        local_banned_users.append(ban_entry.user.id)
+                        count += 1
+                        await asyncio.sleep(1)  # Prevent rate limits
+                        if count % 5 == 0:  # Log every 5 bans
+                            log.info(f"Still fetching bans from {guild.name}... {count} bans added so far.")
+                log.info(f"Finished fetching bans from {guild.name}. {count} bans added.")
+            except discord.HTTPException as e:
+                log.error(f"Error fetching bans from {guild.name}: {e}")
+            return local_banned_users
+
+        # Run fetch_bans concurrently for all servers
+        tasks = [fetch_bans(guild) for guild in self.bot.guilds]
+        results = await asyncio.gather(*tasks)
+
+        # Combine all fetched banned users into one list, removing duplicates
+        for result in results:
+            for user_id in result:
+                if user_id not in banned_users:
+                    banned_users.append(user_id)
+
+        # Remove duplicates using a set to ensure no duplicates in the final list
+        banned_users = list(set(banned_users))
+
         # Save the bans to YAML
         try:
             with open("globalbans.yaml", "w") as file:
@@ -132,7 +167,7 @@ class GlobalBan(commands.Cog):
             return await ctx.send("An error occurred while saving the global ban list.")
         
         await self.config.banned_users.set(banned_users)
-        await ctx.send("Global ban list updated from the current server.")
+        await ctx.send("Global ban list updated from all servers.")
 
     @commands.command()
     @commands.is_owner()
@@ -140,9 +175,43 @@ class GlobalBan(commands.Cog):
         if not os.path.exists("globalbans.yaml"):
             with open("globalbans.yaml", "w") as file:
                 yaml.dump([], file)
-        await ctx.author.send(file=discord.File("globalbans.yaml"))
-        await ctx.send("Global ban list sent to your DMs.")
+        try:
+            with open("globalbans.yaml", "r") as file:
+                data = yaml.safe_load(file) or []  # Safely load the content if file is not empty
+            await ctx.author.send(f"Global Ban List: {data}")
+            await ctx.send("Global ban list sent to your DMs.")
+        except Exception as e:
+            log.error(f"Error reading the global ban list: {e}")
+            await ctx.send("An error occurred while reading the global ban list.")
 
+    async def load_globalban_list(self):
+        """Helper function to load global ban list from YAML."""
+        if not os.path.exists("globalbans.yaml"):
+            return []
+        try:
+            with open("globalbans.yaml", "r") as file:
+                return yaml.safe_load(file) or []
+        except Exception as e:
+            log.error(f"Error loading the global ban list: {e}")
+            return []
+
+    async def add_to_globalban_list(self, user_id, reason):
+        """Helper function to add a user and reason to the global ban list."""
+        global_ban_list = await self.load_globalban_list()
+
+        # Remove existing entry for user if exists
+        global_ban_list = [entry for entry in global_ban_list if entry['user_id'] != user_id]
+        
+        # Add new entry for the user
+        global_ban_list.append({"user_id": user_id, "reason": reason})
+        
+        # Write the updated list to the YAML file
+        try:
+            with open("globalbans.yaml", "w") as file:
+                yaml.dump(global_ban_list, file)
+            log.info(f"User {user_id} added to global ban list with reason: {reason}")
+        except Exception as e:
+            log.error(f"Error saving global ban list: {e}")
 
 def setup(bot):
     bot.add_cog(GlobalBan(bot))
