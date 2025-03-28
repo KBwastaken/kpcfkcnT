@@ -2,6 +2,7 @@
 import discord
 import yaml
 import asyncio
+import os
 from redbot.core import commands, Config, checks
 from redbot.core.bot import Red
 
@@ -101,6 +102,9 @@ class GlobalBan(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def globalbanlist(self, ctx):
+        if not os.path.exists("globalbans.yaml"):
+            with open("globalbans.yaml", "w") as file:
+                yaml.dump([], file)
         await ctx.author.send(file=discord.File("globalbans.yaml"))
         await ctx.send("Global ban list sent to your DMs.")
 
