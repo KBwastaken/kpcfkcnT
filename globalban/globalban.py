@@ -113,9 +113,16 @@ class GlobalBan(commands.Cog):
             log.error(f"Error fetching bans from {guild.name}: {e}")
             return await ctx.send(f"An error occurred while fetching bans from {guild.name}.")
         
+        # Save the bans to YAML
+        try:
+            with open("globalbans.yaml", "w") as file:
+                yaml.dump(banned_users, file)
+            log.info(f"Global ban list updated with {len(banned_users)} users.")
+        except Exception as e:
+            log.error(f"Error saving the global ban list: {e}")
+            return await ctx.send("An error occurred while saving the global ban list.")
+        
         await self.config.banned_users.set(banned_users)
-        with open("globalbans.yaml", "w") as file:
-            yaml.dump(banned_users, file)
         await ctx.send("Global ban list updated from the current server.")
 
     @commands.command()
