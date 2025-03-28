@@ -1,4 +1,3 @@
-# globalban.py
 import discord
 import yaml
 import asyncio
@@ -91,26 +90,33 @@ class GlobalBan(commands.Cog):
         await self.sync_bans()
         await ctx.send("Global bans synced.")
 
-@commands.command()
-@commands.is_owner()
-async def globalbanupdatelist(self, ctx):
-    log.info("Updating global ban list from the current server...")
-    banned_users = []
-    guild = ctx.guild  # Get the server where the command was issued
-    try:
-        async for ban_entry in guild.bans():
-            if ban_entry.user.id not in banned_users:
-                banned_users.append(ban_entry.user.id)
-                await asyncio.sleep(1)  # Prevent rate limits
-        log.info(f"Fetched bans from {guild.name}")
-    except discord.HTTPException as e:
-        log.error(f"Error fetching bans from {guild.name}: {e}")
-    
-    await self.config.banned_users.set(banned_users)
-    with open("globalbans.yaml", "w") as file:
-        yaml.dump(banned_users, file)
-    await ctx.send("Global ban list updated from the current server.")
-
+    @commands.command()
+    @commands.is_owner()
+    async def globalbanupdatelist(self, ctx):
+        log.info("Updating global ban list from the current server...")
+        banned_users = []
+        
+        guild = ctx.guild  # Get the server where the command was issued
+        if not guild:
+            log.error("No guild found. This command must be run from a server.")
+            return await ctx.send("This command must be run from a server.")
+        
+        log.info(f"Fetching bans from the server: {guild.name}")
+        
+        try:
+            async for ban_entry in guild.bans():
+                if ban_entry.user.id not in banned_users:
+                    banned_users.append(ban_entry.user.id)
+                    await asyncio.sleep(1)  # Prevent rate limits
+            log.info(f"Fetched {len(banned_users)} bans from {guild.name}")
+        except discord.HTTPException as e:
+            log.error(f"Error fetching bans from {guild.name}: {e}")
+            return await ctx.send(f"An error occurred while fetching bans from {guild.name}.")
+        
+        await self.config.banned_users.set(banned_users)
+        with open("globalbans.yaml", "w") as file:
+            yaml.dump(banned_users, file)
+        await ctx.send("Global ban list updated from the current server.")
 
     @commands.command()
     @commands.is_owner()
