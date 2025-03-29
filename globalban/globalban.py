@@ -11,6 +11,7 @@ class GlobalBan(commands.Cog):
         self.config = Config.get_conf(self, identifier=1234567890, force_registration=True)
         self.config.register_global(ban_list={})
         self.ban_sync_task = self.bot.loop.create_task(self.ban_sync_loop())
+        self.ban_update_task = self.bot.loop.create_task(self.ban_update_loop())
     
     async def ban_sync_loop(self):
         await self.bot.wait_until_ready()
@@ -20,13 +21,21 @@ class GlobalBan(commands.Cog):
             log.info("Global ban sync complete. Next sync in 12 hours.")
             await asyncio.sleep(43200)  # 12 hours
     
+    async def ban_update_loop(self):
+        await self.bot.wait_until_ready()
+        while True:
+            log.info("Starting 6-hour global ban list update...")
+            await self.globalbanupdatelist(None)
+            log.info("Global ban list update complete. Next update in 6 hours.")
+            await asyncio.sleep(21600)  # 6 hours
+    
     async def sync_bans(self):
         ban_list = await self.config.ban_list()
         for guild in self.bot.guilds:
             log.info(f"Syncing bans for {guild.name}...")
             count = 0
             for user_id in ban_list.keys():
-                user = discord.Object(id=user_id)
+                user = discord.Object(id=int(user_id))
                 try:
                     await guild.ban(user, reason="Global ban sync")
                     count += 1
@@ -110,14 +119,16 @@ class GlobalBan(commands.Cog):
                 log.info(f"Fetched {len(banned_users)} bans from {guild.name}")
             except discord.HTTPException as e:
                 log.error(f"Error fetching bans from {guild.name}: {e}")
-                await ctx.send(f"An error occurred while fetching bans from {guild.name}.")
+                if ctx:
+                    await ctx.send(f"An error occurred while fetching bans from {guild.name}.")
         
         await self.config.ban_list.set(banned_users)
         log.info(f"All fetched, list updated. Total bans: {len(banned_users)}")
-        await ctx.send(f"Global ban list updated. {len(banned_users)} bans recorded.")
+        if ctx:
+            await ctx.send(f"Global ban list updated. {len(banned_users)} bans recorded.")
     
     @commands.command()
-    async def globalban(self, ctx, user: discord.Member, *, reason="No reason provided"):
+    async def globalban(self, ctx, user: discord.User, *, reason="No reason provided"):
         """Ban a user globally"""
         ban_list = await self.config.ban_list()
         if str(user.id) in ban_list:
