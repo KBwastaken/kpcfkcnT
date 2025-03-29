@@ -9,7 +9,7 @@ import logging
 # Set up logging for debugging and progress tracking
 logging.basicConfig(level=logging.INFO)
 
-class GlobalBan(commands.Cog):
+class GlobalBan(commands.Cog):  # Ensure it inherits from commands.Cog
     def __init__(self, bot):
         self.bot = bot
         self.ban_list_file = "globalbans.yaml"  # Path to the file storing global bans
@@ -194,4 +194,4 @@ class GlobalBan(commands.Cog):
 
 # Add the cog to the bot
 def setup(bot):
-    bot.add_cog(GlobalBan(bot))
+    bot.add_cog(GlobalBan(bot))  # Use the correct method to load the cog
