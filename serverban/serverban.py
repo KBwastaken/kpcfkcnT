@@ -24,7 +24,7 @@ class ServerBan(commands.Cog):
         async for ban_entry in guild.bans():
             if ban_entry.user.id == user_id:
                 return await ctx.send("User is already banned.")
-
+        
         try:
             user = await self.bot.fetch_user(user_id)
             embed = discord.Embed(
@@ -56,8 +56,13 @@ class ServerBan(commands.Cog):
         invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
 
         # Check if the user is already unbanned
-        bans = [ban_entry.user.id for ban_entry in await guild.bans()]
-        if user_id not in bans:
+        is_banned = False
+        async for ban_entry in guild.bans():
+            if ban_entry.user.id == user_id:
+                is_banned = True
+                break
+        
+        if not is_banned:
             return await ctx.send("User is already unbanned.")
         
         try:
@@ -80,7 +85,7 @@ class ServerBan(commands.Cog):
             await ctx.send("User not found. They may have deleted their account.")
         except discord.Forbidden:
             await ctx.send("Could not DM the user.")
-
+        
         await guild.unban(discord.Object(id=user_id), reason=reason)
         await ctx.send(f"User with ID `{user_id}` has been unbanned from {guild.name}.")
 
