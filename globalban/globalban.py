@@ -28,7 +28,7 @@ def save_ban_list():
 def is_globally_banned(user_id):
     return user_id in [ban_entry['user_id'] for ban_entry in banned_users]
 
-class GlobalBanCog(commands.Cog):
+class GlobalBanCog(commands.Cog):  # Ensure this inherits from commands.Cog
     def __init__(self, bot):
         self.bot = bot
         load_ban_list()  # Load the ban list on startup
