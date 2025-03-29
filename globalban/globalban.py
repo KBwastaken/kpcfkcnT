@@ -65,9 +65,7 @@ class GlobalBan(commands.Cog):
                 f.write(content)
             await ctx.send("Global ban list is too large. Sending as a file.", file=discord.File("globalbanlist.txt"))
         else:
-            await ctx.send(f"```
-{content}
-```")
+            await ctx.send(f"```{content}```")
     
     @commands.command()
     async def globalbanlistwipe(self, ctx):
@@ -120,7 +118,7 @@ class GlobalBan(commands.Cog):
     
     @commands.command()
     async def globalban(self, ctx, user: discord.Member, *, reason="No reason provided"):
-        "Ban a user globally"
+        """Ban a user globally"""
         ban_list = await self.config.ban_list()
         if str(user.id) in ban_list:
             await ctx.send("User is already globally banned.")
