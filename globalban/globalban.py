@@ -40,6 +40,55 @@ class GlobalBan(commands.Cog):
             log.info(f"All bans synced in {guild.name} ({count} total).")
 
     @commands.command()
+    async def bansync(self, ctx):
+        """Manually sync global bans across all servers."""
+        await self.sync_bans()
+        await ctx.send("Ban sync complete.")
+    
+    @commands.command()
+    async def globaltotalbans(self, ctx):
+        """Show total number of globally banned users."""
+        ban_list = await self.config.ban_list()
+        await ctx.send(f"{len(ban_list)} users have been globally banned.")
+    
+    @commands.command()
+    async def globalbanlist(self, ctx):
+        """Send the global ban list."""
+        ban_list = await self.config.ban_list()
+        if not ban_list:
+            await ctx.send("The global ban list is empty.")
+            return
+        
+        content = "\n".join([f"{uid}: {data['reason']}" for uid, data in ban_list.items()])
+        if len(content) > 1500:
+            with open("globalbanlist.txt", "w") as f:
+                f.write(content)
+            await ctx.send("Global ban list is too large. Sending as a file.", file=discord.File("globalbanlist.txt"))
+        else:
+            await ctx.send(f"```
+{content}
+```")
+    
+    @commands.command()
+    async def globalbanlistwipe(self, ctx):
+        """Wipe the entire global ban list."""
+        msg = await ctx.send("Are you sure you want to wipe the global ban list? React with ✅ to confirm.")
+        await msg.add_reaction("✅")
+        
+        def check(reaction, user):
+            return user == ctx.author and str(reaction.emoji) == "✅"
+        
+        try:
+            await self.bot.wait_for("reaction_add", timeout=30.0, check=check)
+        except asyncio.TimeoutError:
+            await ctx.send("Wipe request timed out.")
+            return
+        
+        await self.config.ban_list.set({})
+        await ctx.send("Global ban list wiped.")
+        log.info("Global ban list has been wiped.")
+    
+    @commands.command()
     async def globalbanupdatelist(self, ctx):
         """Fetch all bans from all servers and update the global list."""
         log.info("Updating global ban list from the current servers...")
@@ -90,28 +139,6 @@ class GlobalBan(commands.Cog):
         
         await ctx.send(f"{user} has been globally banned.")
         log.info(f"{user} globally banned by {ctx.author} for: {reason}")
-
-    @commands.command()
-    async def unglobalban(self, ctx, user: discord.User):
-        "Unban a user globally"
-        ban_list = await self.config.ban_list()
-        if str(user.id) not in ban_list:
-            await ctx.send("User is not globally banned.")
-            return
-        
-        del ban_list[str(user.id)]
-        await self.config.ban_list.set(ban_list)
-        
-        for guild in self.bot.guilds:
-            try:
-                await guild.unban(user)
-            except discord.Forbidden:
-                log.warning(f"No permission to unban {user} in {guild.name}")
-            except discord.HTTPException as e:
-                log.error(f"Failed to unban {user} in {guild.name}: {e}")
-        
-        await ctx.send(f"{user} has been globally unbanned.")
-        log.info(f"{user} globally unbanned by {ctx.author}")
 
 async def setup(bot):
     await bot.add_cog(GlobalBan(bot))
