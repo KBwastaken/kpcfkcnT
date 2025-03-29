@@ -1,21 +1,24 @@
 import discord
 from discord.ext import commands, tasks
 import yaml
+import logging
 from datetime import datetime
 import pytz
-import logging
+import asyncio
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 
-class GlobalBan(commands.Cog):  # Ensure this inherits from commands.Cog
+class GlobalBan(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.ban_list_file = "globalbans.yaml"
         self.timezone = pytz.timezone("Europe/Amsterdam")
-        self.ban_sync_time = None
+        self.ban_sync.start()  # Start the 12h rotation task
+        logging.info("GlobalBan cog has been loaded successfully.")
 
     def load_ban_list(self):
+        """Load the ban list from the YAML file."""
         try:
             with open(self.ban_list_file, 'r') as file:
                 return yaml.safe_load(file) or []
@@ -24,17 +27,22 @@ class GlobalBan(commands.Cog):  # Ensure this inherits from commands.Cog
             return []
 
     def save_ban_list(self, ban_list):
+        """Save the updated ban list to the YAML file."""
         with open(self.ban_list_file, 'w') as file:
             yaml.dump(ban_list, file, default_flow_style=False)
         logging.info("Global ban list saved.")
 
-    @tasks.loop(hours=12)
-    async def ban_check_loop(self):
-        """Runs the global ban sync every 12 hours (both noon and midnight Amsterdam time)."""
+    async def rotate_ban_sync(self):
+        """Handle the 12-hour rotation sync."""
         current_time = datetime.now(self.timezone)
-        if current_time.hour == 12:  # Sync at noon and midnight
-            logging.info("Starting the global ban sync.")
+        hour = current_time.hour
+        if hour == 12 or hour == 0:  # Every 12 hours (afternoon and midnight Amsterdam time)
             await self.sync_bans()
+
+    @tasks.loop(hours=12)
+    async def ban_sync(self):
+        """12-hour rotation task."""
+        await self.rotate_ban_sync()
 
     @commands.command()
     async def globalban(self, ctx, user: discord.User, *, reason: str = "No reason provided"):
@@ -58,6 +66,7 @@ class GlobalBan(commands.Cog):  # Ensure this inherits from commands.Cog
         ban_list.append(ban_entry)
         self.save_ban_list(ban_list)
 
+        # Apply the ban across all servers
         for guild in self.bot.guilds:
             try:
                 member = guild.get_member(user.id)
@@ -85,6 +94,7 @@ class GlobalBan(commands.Cog):  # Ensure this inherits from commands.Cog
 
         self.save_ban_list(new_ban_list)
 
+        # Unban the user from all servers
         for guild in self.bot.guilds:
             try:
                 member = guild.get_member(user.id)
@@ -152,11 +162,59 @@ class GlobalBan(commands.Cog):  # Ensure this inherits from commands.Cog
             await ctx.send("The global ban list has been wiped.")
             logging.info("Global ban list wiped.")
 
+    # Utility function to log bans across all servers
+    async def log_bans(self, bans, guild_name):
+        for ban in bans:
+            logging.info(f"Ban details from {guild_name}: User {ban.user.name}, Reason: {ban.reason}")
+
+    # Utility function for rotating ban checks
     async def sync_bans(self):
-        """Sync bans across all servers."""
-        logging.info("Syncing bans across all servers...")
-        await self.globalbanupdatelist()
+        logging.info("Starting global ban sync.")
+        guilds = self.bot.guilds
+        total_bans = 0
+
+        for guild in guilds:
+            logging.info(f"Checking bans for guild: {guild.name}")
+            bans = await guild.bans()
+            for ban_entry in bans:
+                logging.info(f"Banned user: {ban_entry.user}, Reason: {ban_entry.reason}")
+                total_bans += 1
+
+        logging.info(f"Ban sync complete. Total bans: {total_bans}")
+        await self.bot.owner.send(f"Global ban sync complete. Total bans across all servers: {total_bans}")
+
+    @commands.command()
+    async def forceban(self, ctx, user: discord.User, *, reason: str = "No reason provided"):
+        """Force ban a user even if they are not in the server."""
+        if ctx.author.id != self.bot.owner_id:
+            await ctx.send("This command is owner-locked.")
+            return
+
+        ban_list = self.load_ban_list()
+        if any(ban['user_id'] == str(user.id) for ban in ban_list):
+            await ctx.send(f"{user} is already globally banned.")
+            return
+
+        ban_entry = {
+            "user_id": str(user.id),
+            "reason": reason,
+            "banned_by": str(ctx.author),
+            "date": datetime.now(self.timezone).strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        ban_list.append(ban_entry)
+        self.save_ban_list(ban_list)
+
+        # Apply the ban across all servers
+        for guild in self.bot.guilds:
+            try:
+                await guild.ban(user, reason=reason)
+                logging.info(f"Force banned {user} from {guild.name}")
+            except discord.Forbidden:
+                logging.error(f"Permission denied to force ban {user} from {guild.name}")
+
+        await ctx.send(f"{user} has been forcefully banned from all servers.")
 
 # Add the cog to the bot
 def setup(bot):
-    bot.add_cog(GlobalBan(bot))  # Synchronous setup for Redbot framework
+    bot.add_cog(GlobalBan(bot))  # Synchronous setup
