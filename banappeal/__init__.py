@@ -1,4 +1,4 @@
-from .banappeal import BanAppeal
+from .serverban import ServerBan
 
 async def setup(bot):
-    await bot.add_cog(BanAppeal(bot))
+    await bot.add_cog(ServerBan(bot))
