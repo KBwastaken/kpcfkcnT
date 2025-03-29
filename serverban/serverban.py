@@ -20,6 +20,10 @@ class ServerBan(commands.Cog):
         if not reason:
             reason = f"Action requested by {moderator.name} ({moderator.id})"
 
+        bans = await guild.bans()
+        if any(ban_entry.user.id == user_id for ban_entry in bans):
+            return await ctx.send("User is already banned.")
+
         try:
             user = await self.bot.fetch_user(user_id)
             embed = discord.Embed(
@@ -50,6 +54,10 @@ class ServerBan(commands.Cog):
         guild = ctx.guild
         invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
         
+        bans = await guild.bans()
+        if not any(ban_entry.user.id == user_id for ban_entry in bans):
+            return await ctx.send("User is already unbanned.")
+        
         try:
             user = await self.bot.fetch_user(user_id)
             channel = user.dm_channel or await user.create_dm()
@@ -66,11 +74,10 @@ class ServerBan(commands.Cog):
             view.add_item(button)
             
             await channel.send(embed=embed, view=view)
-            await ctx.send(f"Successfully unbanned `{user_id}` and sent them an invite.")
         except discord.NotFound:
             await ctx.send("User not found. They may have deleted their account.")
         except discord.Forbidden:
-            await ctx.send(f"Could not DM the user. Here is the rejoin link: {invite.url}")
+            await ctx.send("Could not DM the user.")
         
         await guild.unban(discord.Object(id=user_id), reason=reason)
         await ctx.send(f"User with ID `{user_id}` has been unbanned from {guild.name}.")
