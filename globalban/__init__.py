@@ -1,3 +1,4 @@
-# __init__.py file for Redbot cog loading
-def setup(bot):
-    bot.add_cog(GlobalBan(bot))
+from .globalban import GlobalBan
+
+async def setup(bot):
+    await bot.add_cog(GlobalBan(bot))
