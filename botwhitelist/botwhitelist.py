@@ -35,4 +35,4 @@ class BotWhitelist(commands.Cog):
 
 # Setup function to add the cog to the bot
 def setup(bot):
-    bot.add_cog(BotWhitelist(bot))
+    bot.add_cog(BotWhitelist(bot))  # This should remain synchronous
