@@ -1,6 +1,6 @@
-# __init__.py
 from .globalban import GlobalBan
 
 async def setup(bot):
-    cog = GlobalBan(bot)
-    await bot.add_cog(cog)  # Adding the cog asynchronously
+    """Setup function for loading the GlobalBan cog."""
+    await bot.add_cog(GlobalBan(bot))  # Asynchronously add the cog to the bot
+    print("GlobalBan cog loaded successfully.")
