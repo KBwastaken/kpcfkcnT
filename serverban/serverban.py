@@ -46,12 +46,14 @@ class ServerBan(commands.Cog):
     @commands.guild_only()
     @commands.admin_or_permissions(ban_members=True)
     async def sunban(self, ctx: commands.Context, user_id: int, *, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
-        """Unban a user and send them an invite link."""
+        """Unban a user and send them an invite link, trying to use past DMs first."""
         guild = ctx.guild
         invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
         
         try:
             user = await self.bot.fetch_user(user_id)
+            channel = user.dm_channel or await user.create_dm()
+            
             embed = discord.Embed(
                 title="You have been unbanned",
                 description=f"**Reason:** {reason}\n\n"
@@ -63,7 +65,7 @@ class ServerBan(commands.Cog):
             button = discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link)
             view.add_item(button)
             
-            await user.send(embed=embed, view=view)
+            await channel.send(embed=embed, view=view)
             await ctx.send(f"Successfully unbanned `{user_id}` and sent them an invite.")
         except discord.NotFound:
             await ctx.send("User not found. They may have deleted their account.")
