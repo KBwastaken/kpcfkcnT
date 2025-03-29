@@ -64,10 +64,11 @@ class ServerBan(commands.Cog):
             view.add_item(button)
             
             await user.send(embed=embed, view=view)
+            await ctx.send(f"Successfully unbanned `{user_id}` and sent them an invite.")
         except discord.NotFound:
             await ctx.send("User not found. They may have deleted their account.")
         except discord.Forbidden:
-            await ctx.send("Could not DM the user, but they have been unbanned.")
+            await ctx.send(f"Could not DM the user. Here is the rejoin link: {invite.url}")
         
         await guild.unban(discord.Object(id=user_id), reason=reason)
         await ctx.send(f"User with ID `{user_id}` has been unbanned from {guild.name}.")
