@@ -1,7 +1,6 @@
 import discord
 import yaml
 import asyncio
-import os
 from redbot.core import commands, Config
 from redbot.core.bot import Red
 
@@ -19,182 +18,172 @@ class GlobalBan(commands.Cog):
         while not self.bot.is_closed():
             await asyncio.sleep(43200)  # 12 hours
             await self.sync_bans()
-
             owner = self.bot.owner or (await self.bot.application_info()).owner
             if owner:
                 await owner.send("Global ban list checked and updated.")
-                print("Global ban list checked and updated.")  # Logging here
 
     async def sync_bans(self):
         banned_users = await self.config.banned_users()
         ban_reasons = await self.config.ban_reasons()
-        print("Starting sync of global bans.")  # Logging the start of the sync
-        total_bans_fetched = 0
-        for guild in self.bot.guilds:
-            try:
-                print(f"Fetching bans from {guild.name}...")  # Logging guild fetching
-                async for ban_entry in guild.bans():
-                    if ban_entry.user.id not in banned_users:
-                        banned_users.append(ban_entry.user.id)
-                        ban_reasons[ban_entry.user.id] = ban_entry.reason or "Global ban enforced."
-                        print(f"Added ban: {ban_entry.user.id} from {guild.name}.")  # Logging each addition
-                        total_bans_fetched += 1
-                        await asyncio.sleep(1)  # Prevent rate limits
-                await self.config.banned_users.set(banned_users)
-                await self.config.ban_reasons.set(ban_reasons)
-                print(f"Finished syncing bans from {guild.name}.")  # Logging after each guild
-            except discord.HTTPException as e:
-                print(f"Error syncing bans from {guild.name}: {e}")  # Logging the error
-                continue
-        
-        print(f"Finished syncing all bans. Total bans fetched: {total_bans_fetched}.")  # Logging total bans fetched
+        print("Starting global ban sync...")
 
+        for guild in self.bot.guilds:
+            print(f"Fetching bans from {guild.name}...")
+            try:
+                async for ban_entry in guild.bans():
+                    user_id = ban_entry.user.id
+                    if user_id not in banned_users:
+                        # Only add if the user isn't already banned
+                        banned_users.append(user_id)
+                        ban_reasons[user_id] = ban_entry.reason if ban_entry.reason else "No reason provided"
+                        print(f"Added {user_id} to global ban list with reason: {ban_entry.reason}")
+                    await asyncio.sleep(1)  # Prevent rate limits
+            except discord.HTTPException:
+                print(f"Failed to fetch bans for {guild.name}")
+                continue
+
+        await self.config.banned_users.set(banned_users)
+        await self.config.ban_reasons.set(ban_reasons)
+
+        # Now, ban those in the global ban list who aren't already banned in each server
         for user_id in banned_users:
             for guild in self.bot.guilds:
                 try:
-                    print(f"Applying global ban for {user_id} in {guild.name}.")  # Logging each ban application
-                    await guild.ban(discord.Object(id=user_id), reason="Global ban enforced.")
-                    await asyncio.sleep(1)  # Prevent rate limits
+                    # Check if the user is not banned in this guild
+                    if not await self.is_user_banned_in_guild(user_id, guild):
+                        await guild.ban(discord.Object(id=user_id), reason=ban_reasons.get(user_id, "Global ban enforced."))
+                        print(f"Banned {user_id} from {guild.name}")
+                        await asyncio.sleep(1)  # Prevent rate limits
                 except discord.Forbidden:
-                    print(f"Permission denied to ban user {user_id} in {guild.name}.")  # Logging permission error
+                    print(f"Failed to ban {user_id} in {guild.name}")
                     continue
-        print("Finished applying global bans.")  # Final log for the ban application
+
+    async def is_user_banned_in_guild(self, user_id, guild):
+        """Check if the user is already banned in the guild."""
+        try:
+            bans = await guild.bans()
+            return any(ban_entry.user.id == user_id for ban_entry in bans)
+        except discord.HTTPException:
+            return False
 
     @commands.command()
     @commands.is_owner()
-    async def globalban(self, ctx, user: discord.User, *, reason: str):
-        """Globally bans a user across all servers."""
+    async def globalban(self, ctx, user: discord.User, *, reason: str = "No reason provided"):
+        """Global ban a user."""
         banned_users = await self.config.banned_users()
         if user.id in banned_users:
             return await ctx.send("User is already globally banned.")
         
         banned_users.append(user.id)
-        ban_reasons = await self.config.ban_reasons()
-        ban_reasons[user.id] = reason
         await self.config.banned_users.set(banned_users)
-        await self.config.ban_reasons.set(ban_reasons)
-        
+        await self.config.ban_reasons.set({user.id: reason})
+
+        # Apply the global ban to all servers
         for guild in self.bot.guilds:
             try:
-                print(f"Banning {user.id} from {guild.name} with reason: {reason}")  # Logging each ban
                 await guild.ban(user, reason=f"Global Ban: {reason}")
+                print(f"Banned {user} from {guild.name} with reason: {reason}")
                 await asyncio.sleep(1)  # Prevent rate limits
             except discord.Forbidden:
-                print(f"Permission denied to ban {user.id} in {guild.name}.")  # Logging permission error
+                print(f"Failed to ban {user} from {guild.name}")
                 continue
         await ctx.send(f"{user} has been globally banned.")
-        print(f"{user} has been globally banned.")  # Logging successful global ban
 
     @commands.command()
     @commands.is_owner()
-    async def unglobalban(self, ctx, user: discord.User, *, reason: str):
-        """Globally unbans a user across all servers."""
+    async def unglobalban(self, ctx, user: discord.User):
+        """Remove a global ban and unban the user from all servers."""
         banned_users = await self.config.banned_users()
         if user.id not in banned_users:
             return await ctx.send("User is not globally banned.")
         
         banned_users.remove(user.id)
-        ban_reasons = await self.config.ban_reasons()
-        del ban_reasons[user.id]
         await self.config.banned_users.set(banned_users)
-        await self.config.ban_reasons.set(ban_reasons)
+        await self.config.ban_reasons.set({user.id: None})
 
+        # Remove the global ban from all servers
         for guild in self.bot.guilds:
             try:
-                print(f"Unbanning {user.id} from {guild.name} with reason: {reason}")  # Logging each unban
-                await guild.unban(user, reason=f"Global Unban: {reason}")
+                await guild.unban(user)
+                print(f"Unbanned {user} from {guild.name}")
                 await asyncio.sleep(1)  # Prevent rate limits
             except discord.Forbidden:
-                print(f"Permission denied to unban {user.id} in {guild.name}.")  # Logging permission error
+                print(f"Failed to unban {user} from {guild.name}")
                 continue
         await ctx.send(f"{user} has been globally unbanned.")
-        print(f"{user} has been globally unbanned.")  # Logging successful global unban
 
     @commands.command()
     @commands.is_owner()
     async def bansync(self, ctx):
-        """Syncs the global ban list with all the servers the bot is in and applies the bans."""
-        banned_users = await self.config.banned_users()
-        ban_reasons = await self.config.ban_reasons()
-
-        total_bans_applied = 0
-        for user_id in banned_users:
-            for guild in self.bot.guilds:
-                try:
-                    reason = ban_reasons.get(user_id, "Global ban enforced.")
-                    print(f"Applying global ban for {user_id} in {guild.name} with reason: {reason}")  # Logging each ban application
-                    await guild.ban(discord.Object(id=user_id), reason=reason)
-                    total_bans_applied += 1
-                    await asyncio.sleep(1)  # Prevent rate limits
-                except discord.Forbidden:
-                    print(f"Permission denied to ban {user_id} in {guild.name}.")  # Logging permission error
-                    continue
-        await ctx.send(f"{total_bans_applied} global bans have been applied.")
-        print(f"{total_bans_applied} global bans applied.")  # Logging bans applied
-
-    @commands.command()
-    @commands.is_owner()
-    async def globaltotalbans(self, ctx):
-        """Shows the total number of globally banned users."""
-        banned_users = await self.config.banned_users()
-        total_bans = len(banned_users)
-        await ctx.send(f"There are currently {total_bans} users globally banned.")
-        print(f"Total global bans: {total_bans}")  # Logging total bans
+        """Sync the global bans to all servers."""
+        await self.sync_bans()
+        await ctx.send("Global bans synced.")
 
     @commands.command()
     @commands.is_owner()
     async def globalbanupdatelist(self, ctx):
-        """Updates the global ban list by fetching bans from all servers."""
-        banned_users = await self.config.banned_users()
-        ban_reasons = await self.config.ban_reasons()
-        total_bans_fetched = 0
-        server_counter = 0
-        chunk_size = 5  # You can adjust this number to change the chunk size
+        """Update the global ban list and remove duplicates."""
+        banned_users = []
+        ban_reasons = {}
 
-        # Loop over all guilds (servers the bot is in)
         for guild in self.bot.guilds:
-            server_counter += 1
-            fetched_bans = 0
-            chunk_counter = 0
-            chunk_bans = []
-
-            # Try fetching bans from the server
+            print(f"Fetching bans from {guild.name}...")
             try:
-                print(f"Fetching bans from {guild.name}...")  # Logging guild fetching
-                async for ban_entry in guild.bans():  # This is an async generator, so we need to iterate over it
-                    # Check if the user is already globally banned; if not, add them
-                    if ban_entry.user.id not in banned_users:
-                        banned_users.append(ban_entry.user.id)
-                        ban_reasons[ban_entry.user.id] = ban_entry.reason or "Global ban enforced."
-                        chunk_bans.append(ban_entry.user.id)
-                        fetched_bans += 1
-                        chunk_counter += 1
-
-                        # Log each chunk's progress
-                        if chunk_counter >= chunk_size:
-                            # After processing a chunk of bans, log the progress and reset the chunk
-                            print(f"Processed {chunk_size} bans from {guild.name}.")
-                            chunk_bans = []  # Clear the chunk list
-                            chunk_counter = 0  # Reset chunk counter
-
-                # If there are any remaining bans in the chunk after the loop, log them
-                if chunk_counter > 0:
-                    print(f"Processed {chunk_counter} bans from {guild.name}.")  # Logging the chunk of bans
-                    chunk_bans = []  # Clear after logging
-
-                await self.config.banned_users.set(banned_users)
-                await self.config.ban_reasons.set(ban_reasons)
-                print(f"Finished fetching bans from {guild.name}. {fetched_bans} bans fetched.")  # Logging after each server
-            except discord.HTTPException as e:
-                print(f"Error fetching bans from {guild.name}: {e}")  # Logging the error
+                async for ban_entry in guild.bans():
+                    user_id = ban_entry.user.id
+                    if user_id not in banned_users:
+                        banned_users.append(user_id)
+                        ban_reasons[user_id] = ban_entry.reason if ban_entry.reason else "No reason provided"
+                        print(f"Added {user_id} to global ban list with reason: {ban_entry.reason}")
+                    await asyncio.sleep(1)  # Prevent rate limits
+            except discord.HTTPException:
+                print(f"Failed to fetch bans for {guild.name}")
                 continue
 
-        print(f"Global ban list updated. Total bans fetched: {total_bans_fetched}.")  # Final log for updates
+        await self.config.banned_users.set(banned_users)
+        await self.config.ban_reasons.set(ban_reasons)
+
+        # Log the update
+        print(f"Global ban list updated. Total bans: {len(banned_users)}")
+        await ctx.send(f"Global ban list updated. Total bans: {len(banned_users)}.")
+
+    @commands.command()
+    @commands.is_owner()
+    async def globalbanlist(self, ctx):
+        """Send the global ban list to the user in chunks of 1500 characters."""
+        banned_users = await self.config.banned_users()
+        ban_reasons = await self.config.ban_reasons()
+        total_bans = len(banned_users)
+
+        if total_bans == 0:
+            await ctx.send("No users are globally banned.")
+            return
+
+        # Prepare the global ban list
+        ban_list = [
+            f"**ID:** {user_id}, **Reason:** {ban_reasons.get(user_id, 'No reason provided')}, **Banned by:** {ctx.author}" 
+            for user_id in banned_users
+        ]
+        
+        # Split the list into chunks of 1500 characters
+        chunk_size = 1500
+        for i in range(0, len(ban_list), chunk_size):
+            chunk = "\n".join(ban_list[i:i + chunk_size])
+            await ctx.author.send(chunk)
+
+        await ctx.send(f"Global ban list sent to your DMs.")
+
+    @commands.command()
+    @commands.is_owner()
+    async def globaltotalbans(self, ctx):
+        """Show the total number of global bans."""
+        banned_users = await self.config.banned_users()
+        await ctx.send(f"Total global bans: {len(banned_users)}.")
 
     @commands.command()
     @commands.is_owner()
     async def globalbanlistwipe(self, ctx):
-        """Wipes the global ban list and requires confirmation."""
+        """Wipe the global ban list with confirmation."""
         await ctx.send("Are you sure you want to wipe the global ban list? React with ✅ to confirm.")
 
         def check(reaction, user):
@@ -211,7 +200,6 @@ class GlobalBan(commands.Cog):
         await self.config.ban_reasons.set({})
         await ctx.send("Global ban list has been wiped.")
         print("Global ban list has been wiped.")  # Logging wipe action
-
 
 def setup(bot):
     bot.add_cog(GlobalBan(bot))
