@@ -179,52 +179,29 @@ class GlobalBan(commands.Cog):
 
                 # If there are any remaining bans in the chunk after the loop, log them
                 if chunk_counter > 0:
-                    print(f"Processed {chunk_counter} bans from {guild.name}.")
-                    chunk_bans = []  # Clear the chunk list
+                    print(f"Processed {chunk_counter} bans from {guild.name}.")  # Logging the chunk of bans
+                    chunk_bans = []  # Clear after logging
 
-                # Keep track of the total bans fetched
-                total_bans_fetched += fetched_bans
-
-            except discord.Forbidden:
-                print(f"Permission denied: Unable to fetch bans from {guild.name}.")  # Logging permission error
-                continue
-            except discord.HTTPException:
-                print(f"An error occurred while fetching bans from {guild.name}.")  # Logging HTTP error
+                await self.config.banned_users.set(banned_users)
+                await self.config.ban_reasons.set(ban_reasons)
+                print(f"Finished fetching bans from {guild.name}. {fetched_bans} bans fetched.")  # Logging after each server
+            except discord.HTTPException as e:
+                print(f"Error fetching bans from {guild.name}: {e}")  # Logging the error
                 continue
 
-        # After finishing all servers, update the global ban list
-        await self.config.banned_users.set(banned_users)
-        await self.config.ban_reasons.set(ban_reasons)
-
-        # Write the updated list to the YAML file
-        with open("globalbans.yaml", "w") as file:
-            yaml.dump(banned_users, file)
-
-        # Log the completion and the total number of bans fetched
-        await ctx.send(f"Global ban list updated. Total bans fetched: {total_bans_fetched} bans.")
-        print(f"Global ban list updated. Total bans fetched: {total_bans_fetched} bans.")  # Logging total fetch
-
-    @commands.command()
-    @commands.is_owner()
-    async def globalbanlist(self, ctx):
-        """Sends the global ban list to the user."""
-        if not os.path.exists("globalbans.yaml"):
-            with open("globalbans.yaml", "w") as file:
-                yaml.dump([], file)
-        await ctx.author.send(file=discord.File("globalbans.yaml"))
-        await ctx.send("Global ban list sent to your DMs.")
-        print("Global ban list sent to the user.")  # Logging successful send
+        print(f"Global ban list updated. Total bans fetched: {total_bans_fetched}.")  # Final log for updates
 
     @commands.command()
     @commands.is_owner()
     async def globalbanlistwipe(self, ctx):
-        """Wipes the global ban list after confirmation."""
-        def check(reaction, user):
-            return user == ctx.author and str(reaction.emoji) == '✅'
-
+        """Wipes the global ban list and requires confirmation."""
         await ctx.send("Are you sure you want to wipe the global ban list? React with ✅ to confirm.")
+
+        def check(reaction, user):
+            return user == ctx.author and str(reaction.emoji) == "✅"
+
         try:
-            reaction, user = await self.bot.wait_for('reaction_add', timeout=60.0, check=check)
+            reaction, _ = await self.bot.wait_for('reaction_add', timeout=60.0, check=check)
         except asyncio.TimeoutError:
             await ctx.send("Wipe operation timed out. No changes made.")
             return
