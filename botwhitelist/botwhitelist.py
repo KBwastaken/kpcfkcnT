@@ -1,16 +1,29 @@
+import json
 from redbot.core import commands
 import discord
 
 class BotWhitelist(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.whitelist = set()  # Store whitelisted bot IDs
+        self.whitelist = self.load_whitelist()  # Load the whitelist from the file
+
+    def load_whitelist(self):
+        """Load the whitelist from a file"""
+        try:
+            with open('whitelist.json', 'r') as file:
+                return set(json.load(file))
+        except FileNotFoundError:
+            return set()  # If file doesn't exist, return an empty set
+
+    def save_whitelist(self):
+        """Save the whitelist to a file"""
+        with open('whitelist.json', 'w') as file:
+            json.dump(list(self.whitelist), file)
 
     @commands.command()
     @commands.is_owner()  # Ensures that only the bot owner can use this command
     async def whitelistbot(self, ctx, bot_id: int):
         """Add or remove a bot to/from the whitelist"""
-        # We add the bot to the whitelist regardless of whether it's in the server or not
         if bot_id in self.whitelist:
             self.whitelist.remove(bot_id)
             await ctx.send(f"Bot with ID {bot_id} has been removed from the whitelist.")
@@ -18,6 +31,9 @@ class BotWhitelist(commands.Cog):
             self.whitelist.add(bot_id)
             await ctx.send(f"Bot with ID {bot_id} has been added to the whitelist.")
         
+        # Save the updated whitelist to the file
+        self.save_whitelist()
+
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         """Automatically kicks unwhitelisted bots upon joining"""
