@@ -1,52 +1,48 @@
 import discord
 from discord.ext import commands, tasks
 import yaml
-import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 import logging
 
-# Set up logging for debugging and progress tracking
+# Set up logging
 logging.basicConfig(level=logging.INFO)
 
-class GlobalBan(commands.Cog):  # Ensure it inherits from commands.Cog
+class GlobalBan(commands.Cog):  # Ensure this inherits from commands.Cog
     def __init__(self, bot):
         self.bot = bot
-        self.ban_list_file = "globalbans.yaml"  # Path to the file storing global bans
-        self.timezone = pytz.timezone("Europe/Amsterdam")  # Amsterdam timezone for sync timing
-        self.ban_sync_time = None  # Keeps track of the last ban sync
-        self.locked = True  # To lock the owner to access commands only
+        self.ban_list_file = "globalbans.yaml"
+        self.timezone = pytz.timezone("Europe/Amsterdam")
+        self.ban_sync_time = None
 
     def load_ban_list(self):
-        """Loads the global ban list from a YAML file."""
         try:
             with open(self.ban_list_file, 'r') as file:
                 return yaml.safe_load(file) or []
         except FileNotFoundError:
-            logging.warning("Global ban list file not found, creating a new one.")
+            logging.warning("Global ban list file not found.")
             return []
 
     def save_ban_list(self, ban_list):
-        """Saves the global ban list to a YAML file."""
         with open(self.ban_list_file, 'w') as file:
             yaml.dump(ban_list, file, default_flow_style=False)
         logging.info("Global ban list saved.")
 
     @tasks.loop(hours=12)
     async def ban_check_loop(self):
-        """Checks for the scheduled global ban sync every 12 hours (noon and midnight Amsterdam time)."""
+        """Runs the global ban sync every 12 hours (both noon and midnight Amsterdam time)."""
         current_time = datetime.now(self.timezone)
-        if current_time.hour == 12:  # Syncs at noon and midnight
+        if current_time.hour == 12:  # Sync at noon and midnight
             logging.info("Starting the global ban sync.")
             await self.sync_bans()
 
     @commands.command()
     async def globalban(self, ctx, user: discord.User, *, reason: str = "No reason provided"):
-        """Adds a global ban entry for a user and bans from all servers."""
+        """Add a user to the global ban list and ban them from all servers."""
         if ctx.author.id != self.bot.owner_id:
             await ctx.send("This command is owner-locked.")
             return
-        
+
         ban_list = self.load_ban_list()
         if any(ban['user_id'] == str(user.id) for ban in ban_list):
             await ctx.send(f"{user} is already globally banned.")
@@ -59,17 +55,15 @@ class GlobalBan(commands.Cog):  # Ensure it inherits from commands.Cog
             "date": datetime.now(self.timezone).strftime("%Y-%m-%d %H:%M:%S")
         }
 
-        # Add to global ban list
         ban_list.append(ban_entry)
         self.save_ban_list(ban_list)
 
-        # Ban user from all servers
         for guild in self.bot.guilds:
             try:
                 member = guild.get_member(user.id)
                 if member:
                     await guild.ban(member, reason=reason)
-                    logging.info(f"Banned {user} from {guild.name} with reason: {reason}")
+                    logging.info(f"Banned {user} from {guild.name}")
             except discord.Forbidden:
                 logging.error(f"Permission denied to ban {user} from {guild.name}")
 
@@ -77,11 +71,11 @@ class GlobalBan(commands.Cog):  # Ensure it inherits from commands.Cog
 
     @commands.command()
     async def unglobalban(self, ctx, user: discord.User):
-        """Removes a global ban entry for a user and unbans from all servers."""
+        """Remove a user from the global ban list and unban them from all servers."""
         if ctx.author.id != self.bot.owner_id:
             await ctx.send("This command is owner-locked.")
             return
-        
+
         ban_list = self.load_ban_list()
         new_ban_list = [ban for ban in ban_list if ban['user_id'] != str(user.id)]
 
@@ -89,10 +83,8 @@ class GlobalBan(commands.Cog):  # Ensure it inherits from commands.Cog
             await ctx.send(f"{user} is not globally banned.")
             return
 
-        # Remove from global ban list
         self.save_ban_list(new_ban_list)
 
-        # Unban user from all servers
         for guild in self.bot.guilds:
             try:
                 member = guild.get_member(user.id)
@@ -106,14 +98,14 @@ class GlobalBan(commands.Cog):  # Ensure it inherits from commands.Cog
 
     @commands.command()
     async def globaltotalbans(self, ctx):
-        """Counts and returns the total number of global bans."""
+        """Send the total number of globally banned users."""
         ban_list = self.load_ban_list()
         total_bans = len(ban_list)
         await ctx.send(f"{total_bans} users have been globally banned.")
 
     @commands.command()
     async def globalbanlist(self, ctx):
-        """Sends the global ban list to the user in chunks."""
+        """Send the list of globally banned users."""
         ban_list = self.load_ban_list()
         chunks = [ban_list[i:i + 5] for i in range(0, len(ban_list), 5)]
         for chunk in chunks:
@@ -123,7 +115,7 @@ class GlobalBan(commands.Cog):  # Ensure it inherits from commands.Cog
 
     @commands.command()
     async def globalbanupdatelist(self, ctx):
-        """Fetches all bans from every server and updates the global ban list."""
+        """Update the global ban list with bans from all servers."""
         guilds = self.bot.guilds
         total_bans = 0
         all_ban_entries = []
@@ -148,7 +140,7 @@ class GlobalBan(commands.Cog):  # Ensure it inherits from commands.Cog
 
     @commands.command()
     async def globalbanlistwipe(self, ctx):
-        """Wipes the entire global ban list after confirmation."""
+        """Wipe the global ban list and all bans from all servers."""
         def check(reaction, user):
             return user == ctx.author and str(reaction.emoji) == '✅'
 
@@ -160,38 +152,11 @@ class GlobalBan(commands.Cog):  # Ensure it inherits from commands.Cog
             await ctx.send("The global ban list has been wiped.")
             logging.info("Global ban list wiped.")
 
-    @commands.command()
-    async def bansync(self, ctx):
-        """Syncs the global ban list with the bans from each server."""
-        await ctx.send("Syncing bans...")
-        await self.globalbanupdatelist(ctx)
-
-    @commands.command()
-    async def globalbanliststatus(self, ctx):
-        """Shows the status of the global ban list."""
-        ban_list = self.load_ban_list()
-        total_bans = len(ban_list)
-        await ctx.send(f"Global ban list contains {total_bans} bans.")
-
-    # Starts the ban sync loop at noon and midnight Amsterdam time
-    @commands.Cog.listener()
-    async def on_ready(self):
-        """Starts the scheduled sync task when the bot is ready."""
-        self.ban_check_loop.start()
-
-    @tasks.loop(hours=12)
-    async def ban_check_loop(self):
-        """Checks the time every 12 hours and performs the sync if it matches."""
-        current_time = datetime.now(self.timezone)
-        if current_time.hour == 12:  # Sync at noon and midnight Amsterdam time
-            logging.info("Starting the global ban sync.")
-            await self.sync_bans()
-
     async def sync_bans(self):
-        """Syncs the global bans from all servers."""
+        """Sync bans across all servers."""
         logging.info("Syncing bans across all servers...")
         await self.globalbanupdatelist()
 
 # Add the cog to the bot
 def setup(bot):
-    bot.add_cog(GlobalBan(bot))  # Use the correct method to load the cog
+    bot.add_cog(GlobalBan(bot))  # Synchronous setup for Redbot framework
