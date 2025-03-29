@@ -3,20 +3,14 @@ import logging
 from redbot.core import commands
 import discord
 
-# Set up logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# Create console handler and set level to INFO
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-
-# Create formatter and add it to the handler
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-
-# Add the console handler to the logger
-logger.addHandler(ch)
+# Set up logging globally to prevent double logging
+logger = logging.getLogger("botwhitelist")
+if not logger.hasHandlers():  # Ensure we only set up handlers once
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
 class BotWhitelist(commands.Cog):
     def __init__(self, bot):
