@@ -156,6 +156,68 @@ class TeamRole(commands.Cog):
                     pass
         await ctx.send("Message sent to all team members!")
 
+  @team.command()   
+  @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+    async def update(self, ctx):  
+        """Update team roles across all servers"""  
+        team_users = await self.config.team_users()  
+        msg = await ctx.send("Starting global role update...")  
+        
+        success = errors = 0  
+        for guild in self.bot.guilds:  
+            try:  
+                role = discord.utils.get(guild.roles, name=self.role_name)  
+                if not role:  
+                    errors += 1  
+                    continue  
+                
+                # Get bot's top role in this guild  
+                bot_top = guild.me.top_role  
+                if not bot_top:  
+                    errors += 1  
+                    continue  
+
+                # Get all roles to sort  
+                roles = guild.roles  
+                
+                # Find the position just below bot's top role  
+                bot_pos = bot_top.position  
+                new_pos = bot_pos - 1  
+                
+                # Ensure team role is below bot's top role  
+                if role.position != new_pos:  
+                    # Move all necessary roles up to make space  
+                    sorted_roles = sorted(roles, key=lambda r: r.position, reverse=True)  
+                    for r in sorted_roles:  
+                        if r.position < bot_pos and r != role:  
+                            try:  
+                                await r.edit(position=r.position + 1)  
+                            except:  
+                                pass  
+                    await role.edit(position=new_pos)  
+                
+                # Sync members  
+                current_members = {m.id for m in role.members}  
+                to_remove = current_members - set(team_users)  
+                to_add = set(team_users) - current_members  
+                
+                for uid in to_remove:  
+                    member = guild.get_member(uid)  
+                    if member:  
+                        await member.remove_roles(role)  
+                
+                for uid in to_add:  
+                    member = guild.get_member(uid)  
+                    if member:  
+                        await member.add_roles(role)  
+                
+                success += 1  
+            except:  
+                errors += 1  
+        
+        await msg.edit(content=f"Updated {success} servers. Errors: {errors}")  
+
+
     @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
     async def getinvite(self, ctx):
