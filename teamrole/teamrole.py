@@ -83,6 +83,23 @@ class TeamRole(commands.Cog):
 
     @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+    async def list(self, ctx):
+        """List all team members"""
+        team_users = await self.config.team_users()
+        members = []
+        for uid in team_users:
+            user = self.bot.get_user(uid)
+            members.append(f"{user.mention} ({user.id})" if user else f"Unknown ({uid})")
+        
+        embed = discord.Embed(
+            title="Team Members",
+            description="\n".join(members) if members else "No members",
+            color=discord.Color.from_str(self.role_color)
+        )
+        await ctx.send(embed=embed)
+
+    @team.command()
+    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
     async def update(self, ctx):
         """Update team roles across all servers"""
         team_users = await self.config.team_users()
@@ -132,30 +149,6 @@ class TeamRole(commands.Cog):
                 await ctx.send("Deletion failed!")
         else:
             await ctx.send("No team role here!")
-
-    @team.command()
-    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
-    async def getinvite(self, ctx):
-        """Generate single-use invites for all servers"""
-        invites = []
-        for guild in self.bot.guilds:
-            try:
-                channel = next((c for c in guild.text_channels if c.permissions_for(guild.me).create_instant_invite), None)
-                if channel:
-                    invite = await channel.create_invite(
-                        max_uses=1,
-                        unique=True,
-                        reason=f"Invite by {ctx.author}"
-                    )
-                    invites.append(f"{guild.name}: {invite.url}")
-            except:
-                pass
-        
-        try:
-            await ctx.author.send("**Server Invites:**\n" + "\n".join(invites))
-            await ctx.send("Check your DMs!")
-        except discord.Forbidden:
-            await ctx.send("Enable DMs to receive invites!")
 
 async def setup(bot):
     await bot.add_cog(TeamRole(bot))
