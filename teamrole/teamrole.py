@@ -158,5 +158,25 @@ class TeamRole(commands.Cog):
         else:
             await ctx.send("No team role here!")
 
+    @team.command()
+    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+    async def sendmessage(self, ctx):
+        """Send a message to all team members"""
+        await ctx.send("Please type your message (you have 5 minutes):")
+        try:
+            msg = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author, timeout=300)
+        except TimeoutError:
+            return await ctx.send("Timed out waiting for message.")
+        
+        team_users = await self.config.team_users()
+        for uid in team_users:
+            user = self.bot.get_user(uid)
+            if user:
+                try:
+                    await user.send(msg.content)
+                except:
+                    pass
+        await ctx.send("Message sent to all team members!")
+
 async def setup(bot):
     await bot.add_cog(TeamRole(bot))
