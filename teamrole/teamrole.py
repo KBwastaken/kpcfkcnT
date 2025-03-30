@@ -53,7 +53,12 @@ class TeamRole(commands.Cog):
                 permissions=perms,
                 reason="Team role setup"
             )
-            await ctx.send(f"Successfully created {new_role.mention}!")
+
+            bot_top_role = ctx.guild.me.top_role
+            if bot_top_role:
+                await new_role.edit(position=bot_top_role.position - 1)
+            
+            await ctx.send(f"Successfully created {new_role.mention} and positioned it below the bot's top role!")
         except discord.Forbidden:
             await ctx.send("I need Manage Roles permission!")
         except discord.HTTPException:
@@ -113,7 +118,10 @@ class TeamRole(commands.Cog):
                     errors += 1  
                     continue  
                 
-                # Sync members  
+                bot_top_role = guild.me.top_role
+                if bot_top_role:
+                    await role.edit(position=bot_top_role.position - 1)
+                
                 current_members = {m.id for m in role.members}  
                 to_remove = current_members - set(team_users)  
                 to_add = set(team_users) - current_members  
