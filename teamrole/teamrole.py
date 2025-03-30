@@ -87,6 +87,7 @@ class TeamRole(commands.Cog):
                 await ctx.send("User not in team list")
 
     @team.command()  
+    @commands.is_owner()
      async def wipe(self, ctx):  
          """Wipe all team data"""  
          try:  
