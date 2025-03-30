@@ -88,7 +88,7 @@ class TeamRole(commands.Cog):
 
     @team.command()  
     @commands.is_owner()
-     async def wipe(self, ctx):  
+    async def wipe(self, ctx):  
          """Wipe all team data"""  
          try:  
              await ctx.send("Type password to confirm wipe:")  
