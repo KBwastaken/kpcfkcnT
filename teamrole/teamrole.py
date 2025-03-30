@@ -156,8 +156,8 @@ class TeamRole(commands.Cog):
                     pass
         await ctx.send("Message sent to all team members!")
 
-  @team.command()   
-  @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+  @team.command()
+@commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
     async def update(self, ctx):  
         """Update team roles across all servers"""  
         team_users = await self.config.team_users()  
