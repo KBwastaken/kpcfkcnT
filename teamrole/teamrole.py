@@ -87,60 +87,20 @@ class TeamRole(commands.Cog):
                 await ctx.send("User not in team list")
 
     @team.command()
-    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
-    async def list(self, ctx):
-        """List all team members"""
-        team_users = await self.config.team_users()
-        members = []
-        for uid in team_users:
-            user = self.bot.get_user(uid)
-            members.append(f"{user.mention} ({user.id})" if user else f"Unknown ({uid})")
-        
-        embed = discord.Embed(
-            title="Team Members",
-            description="\n".join(members) if members else "No members",
-            color=discord.Color.from_str(self.role_color)
-        )
-        await ctx.send(embed=embed)
-
-    @team.command()
-    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
-    async def update(self, ctx):
-        """Update team roles across all servers"""
-        team_users = await self.config.team_users()
-        msg = await ctx.send("Starting global role update...")
-        
-        success = errors = 0  
+    @commands.is_owner()
+    async def wipe(self, ctx):
+        """Wipe all team data"""
+        await self.config.team_users.set([])
+        deleted = 0
         for guild in self.bot.guilds:
-            try:
-                role = discord.utils.get(guild.roles, name=self.role_name)  
-                if not role:  
-                    errors += 1  
-                    continue  
-                
-                bot_top_role = guild.me.top_role
-                if bot_top_role:
-                    await role.edit(position=bot_top_role.position - 1)
-                
-                current_members = {m.id for m in role.members}  
-                to_remove = current_members - set(team_users)  
-                to_add = set(team_users) - current_members  
-                
-                for uid in to_remove:  
-                    member = guild.get_member(uid)  
-                    if member:  
-                        await member.remove_roles(role)  
-                
-                for uid in to_add:  
-                    member = guild.get_member(uid)  
-                    if member:  
-                        await member.add_roles(role)  
-                
-                success += 1  
-            except:  
-                errors += 1  
-        
-        await msg.edit(content=f"Updated {success} servers. Errors: {errors}")  
+            role = discord.utils.get(guild.roles, name=self.role_name)
+            if role:
+                try:
+                    await role.delete()
+                    deleted += 1
+                except:
+                    pass
+        await ctx.send(f"Deleted {deleted} roles. All data cleared.")
 
     @team.command()
     @commands.is_owner()
@@ -160,6 +120,23 @@ class TeamRole(commands.Cog):
 
     @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+    async def list(self, ctx):
+        """List all team members"""
+        team_users = await self.config.team_users()
+        members = []
+        for uid in team_users:
+            user = self.bot.get_user(uid)
+            members.append(f"{user.mention} ({user.id})" if user else f"Unknown ({uid})")
+        
+        embed = discord.Embed(
+            title="Team Members",
+            description="\n".join(members) if members else "No members",
+            color=discord.Color.from_str(self.role_color)
+        )
+        await ctx.send(embed=embed)
+
+    @team.command()
+    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
     async def sendmessage(self, ctx):
         """Send a message to all team members"""
         await ctx.send("Please type your message (you have 5 minutes):")
@@ -168,15 +145,36 @@ class TeamRole(commands.Cog):
         except TimeoutError:
             return await ctx.send("Timed out waiting for message.")
         
+        embed = discord.Embed(title=f"Message from {ctx.author}", description=msg.content, color=discord.Color.from_str(self.role_color))
         team_users = await self.config.team_users()
         for uid in team_users:
             user = self.bot.get_user(uid)
             if user:
                 try:
-                    await user.send(msg.content)
+                    await user.send(embed=embed)
                 except:
                     pass
         await ctx.send("Message sent to all team members!")
+
+    @team.command()
+    @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
+    async def getinvite(self, ctx):
+        """Generate single-use invites for all servers"""
+        invites = []
+        for guild in self.bot.guilds:
+            try:
+                channel = next((c for c in guild.text_channels if c.permissions_for(guild.me).create_instant_invite), None)
+                if channel:
+                    invite = await channel.create_invite(max_uses=1, unique=True, reason=f"Invite by {ctx.author}")
+                    invites.append(f"{guild.name}: {invite.url}")
+            except:
+                pass
+        
+        try:
+            await ctx.author.send("**Server Invites:**\n" + "\n".join(invites))
+            await ctx.send("Check your DMs!")
+        except discord.Forbidden:
+            await ctx.send("Enable DMs to receive invites!")
 
 async def setup(bot):
     await bot.add_cog(TeamRole(bot))
