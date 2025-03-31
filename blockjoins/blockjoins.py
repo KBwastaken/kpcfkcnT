@@ -36,10 +36,11 @@ class BlockJoins(commands.Cog):
         if is_blocking and blocker:
             try:
                 class RespondButton(discord.ui.View):
-                    def __init__(self, bot, blocker):
+                    def __init__(self, bot, blocker, member):
                         super().__init__()
                         self.bot = bot
                         self.blocker = blocker
+                        self.member = member
 
                     @discord.ui.button(label="Send Message Back", style=discord.ButtonStyle.primary)
                     async def send_message(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -55,7 +56,9 @@ class BlockJoins(commands.Cog):
                         async def callback(interaction: discord.Interaction):
                             embed = discord.Embed(
                                 title="Response from a new user",
-                                description=message_input.value,
+                                description=f"**User:** {self.member.name}#{self.member.discriminator}\n"
+                                            f"**User ID:** {self.member.id}\n"
+                                            f"**Message:** {message_input.value}",
                                 color=discord.Color.blue()
                             )
                             await self.blocker.send(embed=embed)
@@ -69,7 +72,7 @@ class BlockJoins(commands.Cog):
                     description=reason,
                     color=discord.Color.red()
                 )
-                view = RespondButton(self.bot, blocker)
+                view = RespondButton(self.bot, blocker, member)
                 await member.send(embed=dm_embed, view=view)
             except discord.HTTPException:
                 pass
