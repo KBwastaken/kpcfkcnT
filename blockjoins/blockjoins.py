@@ -40,4 +40,10 @@ class BlockJoins(commands.Cog):
             except discord.HTTPException:
                 pass
             
+            # Fetch and delete the invite the user used
+            async for invite in guild.invites():
+                if invite.uses > 0:
+                    await invite.delete(reason="Auto-deleting used invite from blocked join.")
+                    break
+            
             await member.kick(reason="Server is locked. Auto-kicked new join.")
