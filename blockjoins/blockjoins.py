@@ -31,12 +31,42 @@ class BlockJoins(commands.Cog):
         
         if is_blocking:
             try:
+                class RespondButton(discord.ui.View):
+                    def __init__(self, bot, author):
+                        super().__init__()
+                        self.bot = bot
+                        self.author = author
+
+                    @discord.ui.button(label="Send Message Back", style=discord.ButtonStyle.primary)
+                    async def send_message(self, interaction: discord.Interaction, button: discord.ui.Button):
+                        modal = discord.ui.Modal(title="Send a Message")
+
+                        message_input = discord.ui.TextInput(
+                            label="Your message:",
+                            style=discord.TextStyle.long,
+                            required=True
+                        )
+                        modal.add_item(message_input)
+
+                        async def callback(interaction: discord.Interaction):
+                            embed = discord.Embed(
+                                title="Response from a new user",
+                                description=message_input.value,
+                                color=discord.Color.blue()
+                            )
+                            await self.author.send(embed=embed)
+                            await interaction.response.send_message("Your message has been sent!", ephemeral=True)
+
+                        modal.on_submit = callback
+                        await interaction.response.send_modal(modal)
+
                 dm_embed = discord.Embed(
                     title="Server Locked",
                     description=reason,
                     color=discord.Color.red()
                 )
-                await member.send(embed=dm_embed)
+                view = RespondButton(self.bot, member)
+                await member.send(embed=dm_embed, view=view)
             except discord.HTTPException:
                 pass
             
