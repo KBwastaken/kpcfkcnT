@@ -9,7 +9,7 @@ class bapprole(commands.Cog):
     owner_id = 1174820638997872721  # Your owner ID
     role_name = "KCN.gg"
     role_color = "#77bcd6"
-    hoist =True
+    hoist = True
 
     def __init__(self, bot):
         self.bot = bot
