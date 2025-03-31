@@ -22,6 +22,16 @@ class BlockInvites(commands.Cog):
             await self.config.guild(guild).block_invites.set(True)
             await self.config.guild(guild).invite_cooldown.set(cooldown)
             await ctx.send(f"🔒 Invite creation is now **blocked**. Cooldown set to {cooldown} seconds.")
+            await self.delete_existing_invites(guild)
+    
+    async def delete_existing_invites(self, guild):
+        """Delete all existing invites in the guild."""
+        try:
+            invites = await guild.invites()
+            for invite in invites:
+                await invite.delete(reason="Auto-deleting existing invites due to invite block.")
+        except discord.HTTPException:
+            pass
     
     @commands.Cog.listener()
     async def on_invite_create(self, invite: discord.Invite):
@@ -42,5 +52,6 @@ class BlockInvites(commands.Cog):
                 await invite.inviter.send(embed=embed)
                 
                 await asyncio.sleep(cooldown)  # Cooldown before another invite can be created
+                await self.delete_existing_invites(guild)  # Ensure no new invites exist
             except discord.HTTPException:
                 pass
