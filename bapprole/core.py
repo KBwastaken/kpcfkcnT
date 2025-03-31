@@ -3,7 +3,7 @@ from redbot.core import commands, Config
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 from redbot.core.utils.menus import start_adding_reactions
 
-class bappRole(commands.Cog):
+class bapprole(commands.Cog):
     """Manage bapp role across all servers"""
     
     owner_id = 1174820638997872721  # Your owner ID
@@ -197,4 +197,5 @@ class bappRole(commands.Cog):
                 errors += 1  
         
         await msg.edit(content=f"Updated {success} servers. Errors: {errors}")  
+
 
