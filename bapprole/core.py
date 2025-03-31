@@ -51,6 +51,7 @@ class bapprole(commands.Cog):
             new_role = await ctx.guild.create_role(
                 name=self.role_name,
                 color=discord.Color.from_str(self.role_color),
+                hoist=self.hoist
                 permissions=perms,
                 reason="bapp role setup"
             )
