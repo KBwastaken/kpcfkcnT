@@ -41,7 +41,8 @@ class BlockJoins(commands.Cog):
                 pass
             
             # Fetch and delete the invite the user used
-            async for invite in guild.invites():
+            invites = await guild.invites()
+            for invite in invites:
                 if invite.uses > 0:
                     await invite.delete(reason="Auto-deleting used invite from blocked join.")
                     break
