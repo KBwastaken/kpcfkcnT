@@ -41,11 +41,14 @@ class BlockJoins(commands.Cog):
                         self.bot = bot
                         self.blocker = blocker
                         self.member = member
+                        self.sent = False
 
                     @discord.ui.button(label="Send Message Back", style=discord.ButtonStyle.primary)
                     async def send_message(self, interaction: discord.Interaction, button: discord.ui.Button):
+                        if self.sent:
+                            return
+                        
                         modal = discord.ui.Modal(title="Send a Message")
-
                         message_input = discord.ui.TextInput(
                             label="Your message:",
                             style=discord.TextStyle.long,
@@ -58,11 +61,15 @@ class BlockJoins(commands.Cog):
                                 title="Response from a new user",
                                 description=f"**User:** {self.member.name}#{self.member.discriminator}\n"
                                             f"**User ID:** {self.member.id}\n"
-                                            f"**Message:** {message_input.value}",
+                                            f"**Message:** {message_input.value}\n\n"
+                                            f"This message was sent in response to the security lock.",
                                 color=discord.Color.blue()
                             )
                             await self.blocker.send(embed=embed)
                             await interaction.response.send_message("Your message has been sent!", ephemeral=True)
+                            button.disabled = True
+                            self.sent = True
+                            await interaction.message.edit(view=self)
 
                         modal.on_submit = callback
                         await interaction.response.send_modal(modal)
