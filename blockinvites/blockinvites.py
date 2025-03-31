@@ -1,16 +1,17 @@
 import discord
+import asyncio
 from redbot.core import commands, Config, checks
 
 class BlockInvites(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=987654321)
-        self.config.register_guild(block_invites=False)
+        self.config.register_guild(block_invites=False, invite_cooldown=10)
     
     @commands.command()
     @checks.is_owner()
-    async def blockinvites(self, ctx):
-        """Toggle blocking new invite links from being created."""
+    async def blockinvites(self, ctx, cooldown: int = 10):
+        """Toggle blocking new invite links from being created and set a cooldown."""
         guild = ctx.guild
         is_blocking_invites = await self.config.guild(guild).block_invites()
         
@@ -19,12 +20,14 @@ class BlockInvites(commands.Cog):
             await ctx.send("🔓 Invite creation is now **unblocked**.")
         else:
             await self.config.guild(guild).block_invites.set(True)
-            await ctx.send("🔒 Invite creation is now **blocked**.")
+            await self.config.guild(guild).invite_cooldown.set(cooldown)
+            await ctx.send(f"🔒 Invite creation is now **blocked**. Cooldown set to {cooldown} seconds.")
     
     @commands.Cog.listener()
     async def on_invite_create(self, invite: discord.Invite):
         guild = invite.guild
         is_blocking_invites = await self.config.guild(guild).block_invites()
+        cooldown = await self.config.guild(guild).invite_cooldown()
         
         if is_blocking_invites:
             try:
@@ -37,5 +40,7 @@ class BlockInvites(commands.Cog):
                     color=discord.Color.red()
                 )
                 await invite.inviter.send(embed=embed)
+                
+                await asyncio.sleep(cooldown)  # Cooldown before another invite can be created
             except discord.HTTPException:
                 pass
