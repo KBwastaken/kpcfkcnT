@@ -168,18 +168,51 @@ class TeamRole(commands.Cog):
     @team.command()
     @commands.is_owner()
     async def delete(self, ctx):
-        """Delete team role in this server"""
+        """Delete team role, category, and channels in this server"""
+        await ctx.send("🛑 **Starting deletion process...**")
+
         role = discord.utils.get(ctx.guild.roles, name=self.role_name)
+        category = discord.utils.get(ctx.guild.categories, name="KCN")
+
+        # Delete role
         if role:
             try:
+                await ctx.send(f"⏳ **Deleting role:** {role.name}...")
                 await role.delete()
-                await ctx.send("Role deleted!")
+                await ctx.send("✅ **Role deleted!**")
             except discord.Forbidden:
-                await ctx.send("Missing permissions!")
-            except discord.HTTPException:
-                await ctx.send("Deletion failed!")
+                return await ctx.send("❌ **Error:** Missing permissions to delete role!")
+            except discord.HTTPException as e:
+                return await ctx.send(f"❌ **Error:** Failed to delete role! `{e}`")
         else:
-            await ctx.send("No team role here!")
+            await ctx.send("⚠️ **No team role found. Skipping role deletion.**")
+
+        # Delete category and channels
+        if category:
+            try:
+                await ctx.send(f"⏳ **Deleting category:** {category.name} and its channels...")
+
+                for channel in category.channels:
+                    try:
+                        await channel.delete()
+                        await ctx.send(f"✅ **Deleted channel:** #{channel.name}")
+                    except discord.Forbidden:
+                        await ctx.send(f"❌ **Error:** Missing permissions to delete `{channel.name}`")
+                    except discord.HTTPException as e:
+                        await ctx.send(f"❌ **Error:** Failed to delete `{channel.name}`! `{e}`")
+
+                await category.delete()
+                await ctx.send(f"✅ **Category deleted:** {category.name}")
+
+            except discord.Forbidden:
+                await ctx.send("❌ **Error:** Missing permissions to delete category!")
+            except discord.HTTPException as e:
+                await ctx.send(f"❌ **Error:** Failed to delete category! `{e}`")
+        else:
+            await ctx.send("⚠️ **No category named 'KCN' found. Skipping category deletion.**")
+
+        await ctx.send("🎉 **Deletion process complete!**")
+
 
     @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
