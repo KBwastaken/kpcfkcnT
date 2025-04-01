@@ -1,4 +1,5 @@
 import discord
+import asyncio
 from redbot.core import commands, Config
 from redbot.core.utils.predicates import MessagePredicate, ReactionPredicate
 from redbot.core.utils.menus import start_adding_reactions
