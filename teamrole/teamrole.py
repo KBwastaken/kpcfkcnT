@@ -102,7 +102,7 @@ class TeamRole(commands.Cog):
 
             # Run setup commands in 'cmd' channel
             if cmd_channel:
-                await ctx.send("**Running setup commands in cmd channel...**")
+                await ctx.send("**Running setup commands in cmd channel...**", delete_after=30)
                 await cmd_channel.send(",bapp setup", delete_after=30)
                 await asyncio.sleep(5)
                 await cmd_channel.send(",bapp update", delete_after=30)
