@@ -22,17 +22,22 @@ class RoleManager(commands.Cog):
         await self.tree.sync()
 
     @app_commands.command(name="assignrole", description="Assigns a role to a user.")
+    @app_commands.describe(role="Role to assign", user="User to assign role to")
     async def assignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member):
+        """Assign a role to a user."""
         await user.add_roles(role)
         await interaction.response.send_message(f"Assigned {role.name} to {user.mention}.", ephemeral=True)
 
     @app_commands.command(name="unassignrole", description="Removes a role from a user.")
+    @app_commands.describe(role="Role to remove", user="User to remove role from")
     async def unassignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member):
+        """Remove a role from a user."""
         await user.remove_roles(role)
         await interaction.response.send_message(f"Removed {role.name} from {user.mention}.", ephemeral=True)
 
     @app_commands.command(name="assignmultirole", description="Assign multiple roles to a user (max 6).")
     async def assignmultirole(self, interaction: discord.Interaction, user: discord.Member, roles: str):
+        """Assign multiple roles to a user (max 6)."""
         role_list = [role.strip() for role in roles.split(",")][:6]
         discord_roles = [discord.utils.get(interaction.guild.roles, name=role) for role in role_list]
         discord_roles = [role for role in discord_roles if role]
@@ -43,6 +48,7 @@ class RoleManager(commands.Cog):
 
     @app_commands.command(name="unassignmultirole", description="Removes multiple roles from a user (max 6).")
     async def unassignmultirole(self, interaction: discord.Interaction, user: discord.Member, roles: str):
+        """Remove multiple roles from a user (max 6)."""
         role_list = [role.strip() for role in roles.split(",")][:6]
         discord_roles = [discord.utils.get(interaction.guild.roles, name=role) for role in role_list]
         discord_roles = [role for role in discord_roles if role]
@@ -53,6 +59,7 @@ class RoleManager(commands.Cog):
 
     @app_commands.command(name="massrole", description="Give or remove a role from all members.")
     async def massrole(self, interaction: discord.Interaction, role: discord.Role, action: str):
+        """Give or remove a role from all members."""
         if action.lower() not in ["give", "remove"]:
             return await interaction.response.send_message("Invalid action. Use 'give' or 'remove'.", ephemeral=True)
         guild = interaction.guild
@@ -70,6 +77,7 @@ class RoleManager(commands.Cog):
 
     @app_commands.command(name="roleif", description="Gives roles if a user has a specific role.")
     async def roleif(self, interaction: discord.Interaction, base_role: discord.Role, roles: str):
+        """Assign roles if a user has a specific role."""
         role_list = [role.strip() for role in roles.split(",")][:6]
         discord_roles = [discord.utils.get(interaction.guild.roles, name=role) for role in role_list]
         discord_roles = [role for role in discord_roles if role]
