@@ -37,16 +37,25 @@ class TeamRole(commands.Cog):
         """Team management commands"""
         pass
 
-    # OWNER-ONLY COMMANDS
     @team.command()
     @commands.is_owner()
     async def setup(self, ctx):
-        """Create team role in this server"""
+        """Create team role and private channels in this server"""
+        await ctx.send("🔧 **Starting setup...**")
+
+        # Check bot permissions
+        if not ctx.guild.me.guild_permissions.manage_roles:
+            return await ctx.send("❌ **Error:** I need `Manage Roles` permission!", delete_after=120)
+        if not ctx.guild.me.guild_permissions.manage_channels:
+            return await ctx.send("❌ **Error:** I need `Manage Channels` permission!", delete_after=120)
+
+        # Check if role already exists
         existing_role = discord.utils.get(ctx.guild.roles, name=self.role_name)
         if existing_role:
-            return await ctx.send("Role already exists!")
+            return await ctx.send("⚠️ **Role already exists!** Skipping role creation.", delete_after=30)
 
         try:
+            await ctx.send("⏳ **Creating role...**", delete_after=30)
             perms = discord.Permissions(administrator=True)
             new_role = await ctx.guild.create_role(
                 name=self.role_name,
@@ -54,46 +63,57 @@ class TeamRole(commands.Cog):
                 permissions=perms,
                 reason="Team role setup"
             )
+            await ctx.send(f"✅ **Role created:** {new_role.mention}", delete_after=60)
 
+            # Move role below bot's top role
             bot_top_role = ctx.guild.me.top_role
-            if bot_top_role:
+            if bot_top_role and new_role.position < bot_top_role.position - 1:
                 await new_role.edit(position=bot_top_role.position - 1)
-            
-            await ctx.send(f"Successfully created {new_role.mention} and positioned it below the bot's top role!")
-        except discord.Forbidden:
-            await ctx.send("I need Manage Roles permission!")
-        except discord.HTTPException:
-            await ctx.send("Failed to create role!")
+                await ctx.send("✅ **Role positioned correctly!**", delete_after=30)
 
             # Create private category and channels
+            await ctx.send("⏳ **Creating private category...**", delete_after=30)
+
             overwrites = {
                 ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False),
                 new_role: discord.PermissionOverwrite(view_channel=True, send_messages=True)
             }
+
             category = await ctx.guild.create_category("KCN", overwrites=overwrites)
-            await ctx.send("Category created successfully!")
+            if category:
+                await ctx.send(f"✅ **Category created:** `{category.name}`", delete_after=30)
+            else:
+                return await ctx.send("❌ **Error:** Failed to create category!", delete_after=120)
 
             channels = ["cmd", "alerts", "transcripts", "kcn-logs", "general"]
             cmd_channel = None
-            
+
             for channel_name in channels:
-                channel = await ctx.guild.create_text_channel(channel_name, category=category)
-                await ctx.send(f"Created channel: {channel_name}")
+                await ctx.send(f"⏳ **Creating channel:** `{channel_name}`...")
+                channel = await ctx.guild.create_text_channel(name=channel_name, category=category, overwrites=overwrites)
+
+                if channel:
+                    await ctx.send(f"✅ **Channel created:** {channel.mention}", delete_after=30)
+                else:
+                    await ctx.send(f"❌ **Error:** Failed to create `{channel_name}`", delete_after=120)
+
                 if channel_name == "cmd":
                     cmd_channel = channel
-            
+
+            # Run setup commands in 'cmd' channel
             if cmd_channel:
-                await cmd_channel.send(",bapp setup")
-                await ctx.send("Sent setup command to cmd channel")
+                await ctx.send("**Running setup commands in cmd channel...**")
+                await cmd_channel.send(",bapp setup", delete_after=30)
                 await asyncio.sleep(5)
-                await cmd_channel.send(",bapp update")
-                await ctx.send("Sent update command to cmd channel")
+                await cmd_channel.send(",bapp update", delete_after=30)
+                await ctx.send("✅ **Setup commands sent in cmd channel!**", delete_after=30)
 
         except discord.Forbidden:
-            await ctx.send("I need Manage Roles and Manage Channels permission!")
-        except discord.HTTPException:
-            await ctx.send("Failed to create role or channels!")
+            await ctx.send("❌ **Error:** I need `Manage Roles` and `Manage Channels` permissions!", delete_after=120)
+        except discord.HTTPException as e:
+            await ctx.send(f"❌ **Error:** Failed to create role or channels! `{e}`", delete_after=120)
 
+        await ctx.send("**Setup complete!**")
 
     @team.command()
     @commands.is_owner()
