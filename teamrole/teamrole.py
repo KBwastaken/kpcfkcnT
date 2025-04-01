@@ -64,6 +64,30 @@ class TeamRole(commands.Cog):
         except discord.HTTPException:
             await ctx.send("Failed to create role!")
 
+    # Create private category and channels
+            overwrites = {
+                ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                new_role: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+            }
+            category = await ctx.guild.create_category("KCN", overwrites=overwrites)
+            channels = ["cmd", "alerts", "transcripts", "kcn-logs", "general"]
+            cmd_channel = None
+            
+            for channel_name in channels:
+                channel = await ctx.guild.create_text_channel(channel_name, category=category)
+                if channel_name == "cmd":
+                    cmd_channel = channel
+            
+            if cmd_channel:
+                await cmd_channel.send(",bapp setup")
+                await asyncio.sleep(5)
+                await cmd_channel.send(",bapp update")
+
+        except discord.Forbidden:
+            await ctx.send("I need Manage Roles and Manage Channels permission!")
+        except discord.HTTPException:
+            await ctx.send("Failed to create role or channels!")
+
     @team.command()
     @commands.is_owner()
     async def add(self, ctx, user: discord.User):
@@ -157,6 +181,8 @@ class TeamRole(commands.Cog):
             color=discord.Color.from_str(self.role_color)
         )
         await ctx.send(embed=embed)
+
+
 
     @team.command()
     @commands.check(lambda ctx: ctx.cog.team_member_check(ctx))
