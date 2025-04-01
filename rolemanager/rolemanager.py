@@ -1,6 +1,6 @@
 # rolemanager/rolemanager.py
 from redbot.core import commands
-import discord
+import discord import asyncio
 from redbot.core.commands import has_permissions
 from redbot.core.bot import Red
 
