@@ -85,7 +85,7 @@ class TeamRole(commands.Cog):
             else:
                 return await ctx.send("❌ **Error:** Failed to create category!", delete_after=120)
 
-            channels = ["cmd", "alerts", "transcripts", "kcn-logs", "general"]
+            channels = [ "general","cmd", "alerts", "transcripts", "kcn-logs"]
             cmd_channel = None
 
             for channel_name in channels:
@@ -96,17 +96,6 @@ class TeamRole(commands.Cog):
                     await ctx.send(f"✅ **Channel created:** {channel.mention}", delete_after=30)
                 else:
                     await ctx.send(f"❌ **Error:** Failed to create `{channel_name}`", delete_after=120)
-
-                if channel_name == "cmd":
-                    cmd_channel = channel
-
-            # Run setup commands in 'cmd' channel
-            if cmd_channel:
-                await ctx.send("**Running setup commands in cmd channel...**", delete_after=30)
-                await cmd_channel.send(",bapp setup", delete_after=30)
-                await asyncio.sleep(5)
-                await cmd_channel.send(",bapp update", delete_after=30)
-                await ctx.send("✅ **Setup commands sent in cmd channel!**", delete_after=30)
 
         except discord.Forbidden:
             await ctx.send("❌ **Error:** I need `Manage Roles` and `Manage Channels` permissions!", delete_after=120)
