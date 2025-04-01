@@ -16,29 +16,40 @@ class RoleManager(commands.Cog):
         self.tree.add_command(self.assignrole)
         self.tree.add_command(self.unassignrole)
         self.tree.add_command(self.assignmultirole)
+        self.tree.add_command(self.unassignmultirole)
         self.tree.add_command(self.massrole)
         self.tree.add_command(self.roleif)
         await self.tree.sync()
 
-    @app_commands.command(name="assignrole", description="Assigns a role to the user.")
-    async def assignrole(self, interaction: discord.Interaction, role: discord.Role):
-        await interaction.user.add_roles(role)
-        await interaction.response.send_message(f"Assigned {role.name} to {interaction.user.mention}.", ephemeral=True)
+    @app_commands.command(name="assignrole", description="Assigns a role to a user.")
+    async def assignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member):
+        await user.add_roles(role)
+        await interaction.response.send_message(f"Assigned {role.name} to {user.mention}.", ephemeral=True)
 
-    @app_commands.command(name="unassignrole", description="Removes a role from the user.")
-    async def unassignrole(self, interaction: discord.Interaction, role: discord.Role):
-        await interaction.user.remove_roles(role)
-        await interaction.response.send_message(f"Removed {role.name} from {interaction.user.mention}.", ephemeral=True)
+    @app_commands.command(name="unassignrole", description="Removes a role from a user.")
+    async def unassignrole(self, interaction: discord.Interaction, role: discord.Role, user: discord.Member):
+        await user.remove_roles(role)
+        await interaction.response.send_message(f"Removed {role.name} from {user.mention}.", ephemeral=True)
 
-    @app_commands.command(name="assignmultirole", description="Assign multiple roles at once (max 6).")
-    async def assignmultirole(self, interaction: discord.Interaction, roles: str):
+    @app_commands.command(name="assignmultirole", description="Assign multiple roles to a user (max 6).")
+    async def assignmultirole(self, interaction: discord.Interaction, user: discord.Member, roles: str):
         role_list = [role.strip() for role in roles.split(",")][:6]
         discord_roles = [discord.utils.get(interaction.guild.roles, name=role) for role in role_list]
         discord_roles = [role for role in discord_roles if role]
         if not discord_roles:
             return await interaction.response.send_message("No valid roles found.", ephemeral=True)
-        await interaction.user.add_roles(*discord_roles)
-        await interaction.response.send_message(f"Assigned {', '.join([role.name for role in discord_roles])} to {interaction.user.mention}.", ephemeral=True)
+        await user.add_roles(*discord_roles)
+        await interaction.response.send_message(f"Assigned {', '.join([role.name for role in discord_roles])} to {user.mention}.", ephemeral=True)
+
+    @app_commands.command(name="unassignmultirole", description="Removes multiple roles from a user (max 6).")
+    async def unassignmultirole(self, interaction: discord.Interaction, user: discord.Member, roles: str):
+        role_list = [role.strip() for role in roles.split(",")][:6]
+        discord_roles = [discord.utils.get(interaction.guild.roles, name=role) for role in role_list]
+        discord_roles = [role for role in discord_roles if role]
+        if not discord_roles:
+            return await interaction.response.send_message("No valid roles found.", ephemeral=True)
+        await user.remove_roles(*discord_roles)
+        await interaction.response.send_message(f"Removed {', '.join([role.name for role in discord_roles])} from {user.mention}.", ephemeral=True)
 
     @app_commands.command(name="massrole", description="Give or remove a role from all members.")
     async def massrole(self, interaction: discord.Interaction, role: discord.Role, action: str):
