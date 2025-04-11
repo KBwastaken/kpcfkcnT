@@ -60,52 +60,51 @@ class ServerBan(commands.Cog):
             except Exception as e:
                 await ctx.send(f"Failed to ban in {guild.name}: {e}")
 
-@commands.command(name="sunban")
-@commands.guild_only()
-@commands.admin_or_permissions(ban_members=True)
-async def sunban(self, ctx: commands.Context, user_id: int, *, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
-    """Unban a user and send them an invite link, trying to use past DMs first."""
-    guild = ctx.guild
-    invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
+    @commands.command(name="sunban")
+    @commands.guild_only()
+    @commands.admin_or_permissions(ban_members=True)
+    async def sunban(self, ctx: commands.Context, user_id: int, *, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
+        """Unban a user and send them an invite link, trying to use past DMs first."""
+        guild = ctx.guild
+        invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
 
-    # Properly checking bans
-    is_banned = False
-    try:
-        async for ban_entry in guild.bans():
-            if ban_entry.user.id == user_id:
-                is_banned = True
-                break
-    except Exception as e:
-        await ctx.send(f"Error while checking bans: {e}")
-        return
+        # Properly checking bans
+        is_banned = False
+        try:
+            async for ban_entry in guild.bans():
+                if ban_entry.user.id == user_id:
+                    is_banned = True
+                    break
+        except Exception as e:
+            await ctx.send(f"Error while checking bans: {e}")
+            return
 
-    if not is_banned:
-        return await ctx.send("User is already unbanned or could not be found in the ban list.")
+        if not is_banned:
+            return await ctx.send("User is already unbanned or could not be found in the ban list.")
 
-    try:
-        user = await self.bot.fetch_user(user_id)
-        channel = user.dm_channel or await user.create_dm()
+        try:
+            user = await self.bot.fetch_user(user_id)
+            channel = user.dm_channel or await user.create_dm()
 
-        embed = discord.Embed(
-            title="You have been unbanned",
-            description=f"**Reason:** {reason}\n\n"
-                        f"**Server:** {guild.name}\n\n"
-                        "Click the button below to rejoin the server.",
-            color=discord.Color.green()
-        )
-        view = discord.ui.View()
-        button = discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link)
-        view.add_item(button)
+            embed = discord.Embed(
+                title="You have been unbanned",
+                description=f"**Reason:** {reason}\n\n"
+                            f"**Server:** {guild.name}\n\n"
+                            "Click the button below to rejoin the server.",
+                color=discord.Color.green()
+            )
+            view = discord.ui.View()
+            button = discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link)
+            view.add_item(button)
 
-        await channel.send(embed=embed, view=view)
-    except discord.NotFound:
-        await ctx.send("User not found. They may have deleted their account.")
-    except discord.Forbidden:
-        await ctx.send("Could not DM the user.")
+            await channel.send(embed=embed, view=view)
+        except discord.NotFound:
+            await ctx.send("User not found. They may have deleted their account.")
+        except discord.Forbidden:
+            await ctx.send("Could not DM the user.")
 
-    await guild.unban(discord.Object(id=user_id), reason=reason)
-    await ctx.send(f"User with ID `{user_id}` has been unbanned from {guild.name}.")
-
+        await guild.unban(discord.Object(id=user_id), reason=reason)
+        await ctx.send(f"User with ID `{user_id}` has been unbanned from {guild.name}.")
 
 async def setup(bot: Red):
     await bot.add_cog(ServerBan(bot))
