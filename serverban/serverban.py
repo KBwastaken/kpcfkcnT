@@ -82,6 +82,7 @@ class ServerBan(commands.Cog):
 
         banned_servers = []  # List to track the guilds where the user is banned
 
+        # Track all the servers where the user is banned
         for guild in target_guilds:
             try:
                 is_banned = False
