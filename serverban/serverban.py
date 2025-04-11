@@ -1,34 +1,36 @@
 import discord
-from redbot.core import commands
+from discord.ext import commands
 
-# Allowed IDs for global ban/unban
-ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153}
 APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
 
 class ServerBan(commands.Cog):
-    """Force-ban or unban users by ID with global option and appeal messaging."""
+    """Force-ban and unban users by ID with appeal messaging."""
 
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @commands.command(name="sban")
     @commands.guild_only()
-    @commands.admin_or_permissions(ban_members=True)
+    @commands.has_permissions(ban_members=True)
     async def sban(self, ctx: commands.Context, user_id: int, global_flag: str, *, reason: str = None):
-        """Ban a user by ID with optional global effect and DM appeal info."""
+        """Ban a user by ID with optional global effect and send appeal message to the user."""
         moderator = ctx.author
         is_global = global_flag.lower() == "yes"
 
-        # Check if the moderator has permission for global bans
-        if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
-            await ctx.send("You are not authorized to use global bans.")
-            return
+        # Global logic check
+        if is_global:
+            ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153}
+            if moderator.id not in ALLOWED_GLOBAL_IDS:
+                await ctx.send("You are not authorized to use global bans.")
+                return
 
         target_guilds = self.bot.guilds if is_global else [ctx.guild]
 
+        # Default reason if not provided
         if not reason:
-            reason = f"servers: globalban" if is_global and len(target_guilds) > 1 else f"Action requested by {moderator.name} ({moderator.id})"
+            reason = f"Action requested by {moderator.name} ({moderator.id})"
 
+        # Ban the user in all target guilds (global or local)
         try:
             user = await self.bot.fetch_user(user_id)
             embed = discord.Embed(
@@ -45,17 +47,23 @@ class ServerBan(commands.Cog):
         except discord.HTTPException:
             await ctx.send("Could not DM the user, but proceeding with the ban.")
 
+        # Try banning in the target guilds
         for guild in target_guilds:
+            is_banned = False
             try:
-                is_banned = False
                 async for entry in guild.bans():
                     if entry.user.id == user_id:
                         is_banned = True
                         break
-                if is_banned:
-                    await ctx.send(f"User is already banned in {guild.name}.")
-                    continue
+            except Exception as e:
+                await ctx.send(f"Error while checking bans in {guild.name}: {e}")
+                continue
 
+            if is_banned:
+                await ctx.send(f"User is already banned in {guild.name}.")
+                continue
+
+            try:
                 await guild.ban(discord.Object(id=user_id), reason=reason)
                 await ctx.send(f"Banned `{user_id}` in {guild.name}.")
             except Exception as e:
@@ -63,36 +71,31 @@ class ServerBan(commands.Cog):
 
     @commands.command(name="sunban")
     @commands.guild_only()
-    @commands.admin_or_permissions(ban_members=True)
+    @commands.has_permissions(ban_members=True)
     async def sunban(self, ctx: commands.Context, user_id: int, *, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
-        """Unban a user and send them an invite link for rejoining the server."""
-
+        """Unban a user by ID and send them an invite link, only in the current server."""
+        
         guild = ctx.guild
+        invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
 
-        # Check if the user is banned
+        # Check if the user is banned in the current guild
         is_banned = False
         try:
-            async for ban_entry in guild.bans():
-                if ban_entry.user.id == user_id:
+            async for entry in guild.bans():
+                if entry.user.id == user_id:
                     is_banned = True
                     break
         except Exception as e:
             await ctx.send(f"Error while checking bans: {e}")
             return
 
-        # If not banned, return a message
         if not is_banned:
-            return await ctx.send("User is already unbanned or could not be found in the ban list.")
-
-        # Create an invite link for the server
-        invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
+            return await ctx.send("User is already unbanned or not found in the ban list.")
 
         try:
-            # Fetch user
             user = await self.bot.fetch_user(user_id)
             channel = user.dm_channel or await user.create_dm()
 
-            # Embed message to notify the user
             embed = discord.Embed(
                 title="You have been unbanned",
                 description=f"**Reason:** {reason}\n\n"
@@ -100,22 +103,23 @@ class ServerBan(commands.Cog):
                             "Click the button below to rejoin the server.",
                 color=discord.Color.green()
             )
-
-            # Add rejoin button to embed
             view = discord.ui.View()
             button = discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link)
             view.add_item(button)
 
-            # Send DM with the embed and invite button
             await channel.send(embed=embed, view=view)
+
         except discord.NotFound:
             await ctx.send("User not found. They may have deleted their account.")
         except discord.Forbidden:
             await ctx.send("Could not DM the user.")
 
         # Unban the user in the current guild
-        await guild.unban(discord.Object(id=user_id), reason=reason)
-        await ctx.send(f"User with ID `{user_id}` has been unbanned from {guild.name}.")
+        try:
+            await guild.unban(discord.Object(id=user_id), reason=reason)
+            await ctx.send(f"User with ID `{user_id}` has been unbanned from {guild.name}.")
+        except Exception as e:
+            await ctx.send(f"Failed to unban user `{user_id}` in {guild.name}: {e}")
 
-async def setup(bot):
+async def setup(bot: commands.Bot):
     await bot.add_cog(ServerBan(bot))
