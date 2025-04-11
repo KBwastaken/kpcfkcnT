@@ -22,7 +22,7 @@ class ServerBan(commands.Cog):
 
     @app_commands.command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
     @app_commands.describe(user_id="The ID of the user to ban", reason="Reason for banning the user")
-    async def sban(self, interaction: discord.Interaction, user_id: str, is_global: str, reason: str = None):
+    async def sban(self, interaction: discord.Interaction, user_id: str, is_global: app_commands.Choice[str], reason: str = None):
         """Ban a user by ID with optional global effect and DM appeal info."""
         try:
             user_id = int(user_id)  # Convert user_id to an integer
@@ -31,11 +31,8 @@ class ServerBan(commands.Cog):
 
         moderator = interaction.user
 
-        # Check if the global ban option is valid (Yes/No)
-        if is_global.lower() not in ["yes", "no"]:
-            return await interaction.response.send_message("Please select a valid option for global ban (Yes or No).")
-
-        is_global = is_global.lower() == "yes"  # Convert the value to a boolean
+        # Determine if global ban is enabled (True for 'Yes', False for 'No')
+        is_global = is_global.name.lower() == 'yes'
 
         if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
             return await interaction.response.send_message("You are not authorized to use global bans.")
