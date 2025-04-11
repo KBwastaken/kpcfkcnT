@@ -25,25 +25,29 @@ class ServerBan(commands.Cog):
 
         target_guilds = self.bot.guilds if is_global else [ctx.guild]
 
+        # Adjust the reason for global bans
         if not reason:
-            reason = f"servers: globalban" if is_global and len(target_guilds) > 1 else f"Action requested by {moderator.name} ({moderator.id})"
+            reason = f"Action requested by {moderator.name} ({moderator.id})"
+        
+        # Prepare the embed with reason and the server details
+        embed = discord.Embed(
+            title="You have been banned",
+            description=f"**Reason:** {reason}\n\n"
+                        f"**Servers:** {'Multiple Servers (globalban)' if is_global else ctx.guild.name}\n\n"
+                        "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
+                        "Try rejoining after 24 hours. If still banned, you can reapply in 30 days.",
+            color=discord.Color.red()
+        )
+        embed.add_field(name="Appeal Link", value=f"[Click here to appeal]({APPEAL_LINK})", inline=False)
+        embed.set_footer(text="Appeals are reviewed by the moderation team.")
 
         try:
             user = await self.bot.fetch_user(user_id)
-            embed = discord.Embed(
-                title="You have been banned",
-                description=f"**Reason:** {reason}\n\n"
-                            f"**Server:** {'Multiple Servers' if is_global else ctx.guild.name}\n\n"
-                            "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
-                            "Try rejoining after 24 hours. If still banned, you can reapply in 30 days.",
-                color=discord.Color.red()
-            )
-            embed.add_field(name="Appeal Link", value=f"[Click here to appeal]({APPEAL_LINK})", inline=False)
-            embed.set_footer(text="Appeals are reviewed by the moderation team.")
             await user.send(embed=embed)
         except discord.HTTPException:
             await ctx.send("Could not DM the user, but proceeding with the ban.")
 
+        # Process banning in target guilds
         for guild in target_guilds:
             try:
                 is_banned = False
