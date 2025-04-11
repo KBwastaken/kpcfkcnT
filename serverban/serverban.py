@@ -33,7 +33,7 @@ class ServerBan(commands.Cog):
             embed = discord.Embed(
                 title="You have been banned",
                 description=f"**Reason:** {reason}\n\n"
-                            f"**Servers:** {'globalban' if is_global and len(target_guilds) > 1 else ctx.guild.name}\n\n"
+                            f"**Servers:** {'Multiple Servers' if is_global else ctx.guild.name}\n\n"
                             "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
                             "Try rejoining after 24 hours. If still banned, you can reapply in 30 days.",
                 color=discord.Color.red()
@@ -110,7 +110,7 @@ class ServerBan(commands.Cog):
                 embed = discord.Embed(
                     title="You have been unbanned",
                     description=f"**Reason:** {reason}\n\n"
-                                f"**Servers:** {'globalban' if is_global and len(successful_unbans) > 1 else ctx.guild.name}\n\n"
+                                f"**Servers:** {'Multiple Servers' if is_global and len(successful_unbans) > 1 else ctx.guild.name}\n\n"
                                 "Click the button(s) below to rejoin the server(s).",
                     color=discord.Color.green()
                 )
