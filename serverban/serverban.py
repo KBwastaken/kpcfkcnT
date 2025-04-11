@@ -26,14 +26,14 @@ class ServerBan(commands.Cog):
         target_guilds = self.bot.guilds if is_global else [ctx.guild]
 
         if not reason:
-            reason = f"Action requested by {moderator.name} ({moderator.id})"
+            reason = f"servers: globalban" if is_global and len(target_guilds) > 1 else f"Action requested by {moderator.name} ({moderator.id})"
 
         try:
             user = await self.bot.fetch_user(user_id)
             embed = discord.Embed(
                 title="You have been banned",
                 description=f"**Reason:** {reason}\n\n"
-                            f"**Servers:** {'Multiple Servers' if is_global else ctx.guild.name}\n\n"
+                            f"**Server:** {'Multiple Servers' if is_global else ctx.guild.name}\n\n"
                             "You may appeal using the link below. Appeals will be reviewed within 12 hours.\n"
                             "Try rejoining after 24 hours. If still banned, you can reapply in 30 days.",
                 color=discord.Color.red()
@@ -64,32 +64,24 @@ class ServerBan(commands.Cog):
     @commands.guild_only()
     @commands.admin_or_permissions(ban_members=True)
     async def sunban(self, ctx: commands.Context, user_id: int, global_flag: str, *, reason: str = None):
-        """Unban a user by ID with optional global scope and DM rejoin invite."""
+        """Unban a user by ID in the guilds the bot is currently in."""
         moderator = ctx.author
         is_global = global_flag.lower() == "yes"
 
-        if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
-            await ctx.send("You are not authorized to use global unbans.")
-            return
-
         if not reason:
-            reason = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"
+            reason = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below."
 
-        target_guilds = self.bot.guilds if is_global else [ctx.guild]
         successful_unbans = []
         failed_guilds = []
         skipped_unbans = []
 
-        banned_servers = []  # List to track the guilds where the user is banned
-
-        # Track all the servers where the user is banned
-        for guild in target_guilds:
+        # Loop through the guilds the bot is in
+        for guild in self.bot.guilds:
             try:
                 is_banned = False
                 async for entry in guild.bans():
                     if entry.user.id == user_id:
                         is_banned = True
-                        banned_servers.append(guild)  # Add to list of banned servers
                         break
             except Exception as e:
                 failed_guilds.append(f"{guild.name} (error checking ban: {e})")
@@ -106,6 +98,7 @@ class ServerBan(commands.Cog):
             except Exception as e:
                 failed_guilds.append(f"{guild.name} (unban error: {e})")
 
+        # After processing, send a summary of the unban attempts
         if successful_unbans:
             try:
                 user = await self.bot.fetch_user(user_id)
@@ -114,14 +107,14 @@ class ServerBan(commands.Cog):
                 embed = discord.Embed(
                     title="You have been unbanned",
                     description=f"**Reason:** {reason}\n\n"
-                                f"**Servers:** {'Multiple Servers' if is_global else ctx.guild.name}\n\n"
+                                f"**Servers:** {', '.join(g.name for g in successful_unbans)}\n\n"
                                 "Click the button(s) below to rejoin the server(s).",
                     color=discord.Color.green()
                 )
                 view = discord.ui.View()
 
-                # Add a button for each server the user was banned from
-                for g in banned_servers:
+                # Add a button for each successful unban with an invite link
+                for g in successful_unbans:
                     try:
                         text_channels = [c for c in g.text_channels if c.permissions_for(g.me).create_instant_invite]
                         if not text_channels:
@@ -137,6 +130,7 @@ class ServerBan(commands.Cog):
             except discord.HTTPException:
                 await ctx.send("Could not DM the user, but they were unbanned.")
 
+        # Summary message of the unban result
         summary = ""
         if successful_unbans:
             summary += f"✅ Successfully unbanned from: {', '.join(g.name for g in successful_unbans)}\n"
