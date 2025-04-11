@@ -109,8 +109,10 @@ class ServerBan(commands.Cog):
         if ban_errors:
             await interaction.followup.send("\n".join(ban_errors))
         else:
-            await interaction.followup.send(f"User {user_id} banned successfully in all target servers.")
-    
+            # Make sure we indicate the global status in the final message
+            global_status = "globally" if is_global else "locally"
+            await interaction.followup.send(f"User {user_id} banned {global_status} in all target servers.")
+
     @app_commands.command(name="sunban", description="Unban a user and send them an invite link, trying to use past DMs first.")
     @app_commands.describe(user_id="The ID of the user to unban", reason="Reason for unbanning the user")
     async def sunban(self, interaction: discord.Interaction, user_id: str, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
