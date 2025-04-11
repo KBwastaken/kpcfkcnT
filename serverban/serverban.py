@@ -1,6 +1,6 @@
 import discord
-from redbot.core import commands
 from discord import app_commands
+from redbot.core import commands
 from redbot.core.bot import Red
 
 ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153}
@@ -22,7 +22,7 @@ class ServerBan(commands.Cog):
 
     @app_commands.command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
     @app_commands.describe(user_id="The ID of the user to ban", reason="Reason for banning the user")
-    async def sban(self, interaction: discord.Interaction, user_id: str, reason: str = None):
+    async def sban(self, interaction: discord.Interaction, user_id: str, is_global: str, reason: str = None):
         """Ban a user by ID with optional global effect and DM appeal info."""
         try:
             user_id = int(user_id)  # Convert user_id to an integer
@@ -31,40 +31,14 @@ class ServerBan(commands.Cog):
 
         moderator = interaction.user
 
-        # Create the Select Menu (Dropdown) for Yes/No
-        select = discord.ui.Select(
-            placeholder="Choose if the ban should be global",
-            options=[
-                discord.SelectOption(label="Yes", description="Apply the ban globally.", value="yes"),
-                discord.SelectOption(label="No", description="Apply the ban to this server only.", value="no")
-            ]
-        )
+        # Check if the global ban option is valid (Yes/No)
+        if is_global.lower() not in ["yes", "no"]:
+            return await interaction.response.send_message("Please select a valid option for global ban (Yes or No).")
 
-        # Create a View to hold the Select Menu
-        view = discord.ui.View()
-        view.add_item(select)
+        is_global = is_global.lower() == "yes"  # Convert the value to a boolean
 
-        # Define what happens when a selection is made
-        async def on_select(interaction: discord.Interaction):
-            """Handle the dropdown selection."""
-            is_global = select.values[0] == "yes"
-            await self.process_ban(interaction, user_id, is_global, reason)
-            await interaction.response.send_message(f"Ban process initiated with global ban: {is_global}.")
-            view.stop()  # Stop the interaction after a choice is made
-
-        select.callback = on_select
-
-        # Send the message and show the dropdown menu
-        await interaction.response.send_message(
-            "Do you want to apply the ban globally? Select 'Yes' or 'No' from the dropdown menu.",
-            view=view
-        )
-
-    async def process_ban(self, interaction: discord.Interaction, user_id: str, is_global: bool, reason: str = None):
-        """Process the banning logic after the global option has been selected."""
-        moderator = interaction.user
         if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
-            return await interaction.followup.send("You are not authorized to use global bans.")
+            return await interaction.response.send_message("You are not authorized to use global bans.")
 
         target_guilds = self.bot.guilds if is_global else [interaction.guild]
 
@@ -85,7 +59,7 @@ class ServerBan(commands.Cog):
             embed.set_footer(text="Appeals are reviewed by the moderation team.")
             await user.send(embed=embed)
         except discord.HTTPException:
-            await interaction.followup.send("Could not DM the user, but proceeding with the ban.")
+            await interaction.response.send_message("Could not DM the user, but proceeding with the ban.")
 
         ban_errors = []  # List to store errors if any occur during banning
 
@@ -107,11 +81,11 @@ class ServerBan(commands.Cog):
 
         # Send a final response only once, containing all the errors and successes
         if ban_errors:
-            await interaction.followup.send("\n".join(ban_errors))
+            await interaction.response.send_message("\n".join(ban_errors))
         else:
             # Make sure we indicate the global status in the final message
             global_status = "globally" if is_global else "locally"
-            await interaction.followup.send(f"User {user_id} banned {global_status} in all target servers.")
+            await interaction.response.send_message(f"User {user_id} banned {global_status} in all target servers.")
 
     @app_commands.command(name="sunban", description="Unban a user and send them an invite link, trying to use past DMs first.")
     @app_commands.describe(user_id="The ID of the user to unban", reason="Reason for unbanning the user")
