@@ -1,6 +1,7 @@
 import discord
 from redbot.core import commands
 from redbot.core.bot import Red
+from redbot.core import slash
 
 ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153}
 APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
@@ -11,10 +12,10 @@ class ServerBan(commands.Cog):
     def __init__(self, bot: Red):
         self.bot = bot
 
-    @commands.command(name="sban")
+    @slash.slash_command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
     @commands.guild_only()
     @commands.admin_or_permissions(ban_members=True)
-    async def sban(self, ctx: commands.Context, user_id: int, global_flag: str, *, reason: str = None):
+    async def sban(self, ctx: commands.Context, user_id: int, global_flag: str, reason: str = None):
         """Ban a user by ID with optional global effect and DM appeal info."""
         moderator = ctx.author
         is_global = global_flag.lower() == "yes"
@@ -60,10 +61,10 @@ class ServerBan(commands.Cog):
             except Exception as e:
                 await ctx.send(f"Failed to ban in {guild.name}: {e}")
 
-    @commands.command(name="sunban")
+    @slash.slash_command(name="sunban", description="Unban a user and send them an invite link.")
     @commands.guild_only()
     @commands.admin_or_permissions(ban_members=True)
-    async def sunban(self, ctx: commands.Context, user_id: int, *, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
+    async def sunban(self, ctx: commands.Context, user_id: int, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
         """Unban a user and send them an invite link, trying to use past DMs first."""
         guild = ctx.guild
         invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
@@ -102,6 +103,3 @@ class ServerBan(commands.Cog):
             await ctx.send("I do not have permission to unban this user.")
         except Exception as e:
             await ctx.send(f"An error occurred while unbanning: {e}")
-
-async def setup(bot: Red):
-    await bot.add_cog(ServerBan(bot))
