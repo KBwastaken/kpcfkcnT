@@ -128,9 +128,10 @@ class ServerBan(commands.Cog):
                         invite = await text_channels[0].create_invite(max_uses=1, unique=True)
                         button = discord.ui.Button(label=f"Rejoin {g.name}", url=invite.url, style=discord.ButtonStyle.link)
                         view.add_item(button)
-                    except Exception:
-                        continue
+                    except Exception as e:
+                        await ctx.send(f"Error generating invite for {g.name}: {e}")
 
+                # Send the embed with the invite buttons
                 await channel.send(embed=embed, view=view)
             except discord.HTTPException:
                 await ctx.send("Could not DM the user, but they were unbanned.")
