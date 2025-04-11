@@ -81,8 +81,8 @@ class ServerBan(commands.Cog):
         skipped_unbans = []
 
         for guild in target_guilds:
-            is_banned = False
             try:
+                is_banned = False
                 async for entry in guild.bans():
                     if entry.user.id == user_id:
                         is_banned = True
@@ -110,7 +110,7 @@ class ServerBan(commands.Cog):
                 embed = discord.Embed(
                     title="You have been unbanned",
                     description=f"**Reason:** {reason}\n\n"
-                                f"**Servers:** {'Multiple Servers' if is_global and len(successful_unbans) > 1 else ctx.guild.name}\n\n"
+                                f"**Servers:** {'Multiple Servers' if is_global else ctx.guild.name}\n\n"
                                 "Click the button(s) below to rejoin the server(s).",
                     color=discord.Color.green()
                 )
