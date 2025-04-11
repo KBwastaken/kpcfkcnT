@@ -1,7 +1,6 @@
 import discord
 from redbot.core import commands
 from redbot.core.bot import Red
-from redbot.core import slash
 
 ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153}
 APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
@@ -12,7 +11,7 @@ class ServerBan(commands.Cog):
     def __init__(self, bot: Red):
         self.bot = bot
 
-    @slash.slash_command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
+    @commands.slash_command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
     @commands.guild_only()
     @commands.admin_or_permissions(ban_members=True)
     async def sban(self, ctx: commands.Context, user_id: int, global_flag: str, reason: str = None):
@@ -61,7 +60,7 @@ class ServerBan(commands.Cog):
             except Exception as e:
                 await ctx.send(f"Failed to ban in {guild.name}: {e}")
 
-    @slash.slash_command(name="sunban", description="Unban a user and send them an invite link.")
+    @commands.slash_command(name="sunban", description="Unban a user and send them an invite link.")
     @commands.guild_only()
     @commands.admin_or_permissions(ban_members=True)
     async def sunban(self, ctx: commands.Context, user_id: int, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
