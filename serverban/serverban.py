@@ -68,43 +68,40 @@ class ServerBan(commands.Cog):
         guild = ctx.guild
         invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
 
-        # Properly checking bans
-        is_banned = False
         try:
-            async for ban_entry in guild.bans():
-                if ban_entry.user.id == user_id:
-                    is_banned = True
-                    break
-        except Exception as e:
-            await ctx.send(f"Error while checking bans: {e}")
-            return
+            # Try to unban the user directly without iterating through the bans list
+            await guild.unban(discord.Object(id=user_id), reason=reason)
 
-        if not is_banned:
-            return await ctx.send("User is already unbanned or could not be found in the ban list.")
+            # If no error occurred, proceed to send DM to the user
+            try:
+                user = await self.bot.fetch_user(user_id)
+                channel = user.dm_channel or await user.create_dm()
 
-        try:
-            user = await self.bot.fetch_user(user_id)
-            channel = user.dm_channel or await user.create_dm()
+                embed = discord.Embed(
+                    title="You have been unbanned",
+                    description=f"**Reason:** {reason}\n\n"
+                                f"**Server:** {guild.name}\n\n"
+                                "Click the button below to rejoin the server.",
+                    color=discord.Color.green()
+                )
+                view = discord.ui.View()
+                button = discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link)
+                view.add_item(button)
 
-            embed = discord.Embed(
-                title="You have been unbanned",
-                description=f"**Reason:** {reason}\n\n"
-                            f"**Server:** {guild.name}\n\n"
-                            "Click the button below to rejoin the server.",
-                color=discord.Color.green()
-            )
-            view = discord.ui.View()
-            button = discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link)
-            view.add_item(button)
+                await channel.send(embed=embed, view=view)
+            except discord.NotFound:
+                await ctx.send("User not found. They may have deleted their account.")
+            except discord.Forbidden:
+                await ctx.send("Could not DM the user.")
 
-            await channel.send(embed=embed, view=view)
+            await ctx.send(f"User with ID `{user_id}` has been unbanned from {guild.name}.")
+
         except discord.NotFound:
-            await ctx.send("User not found. They may have deleted their account.")
+            await ctx.send("The user is not banned.")
         except discord.Forbidden:
-            await ctx.send("Could not DM the user.")
-
-        await guild.unban(discord.Object(id=user_id), reason=reason)
-        await ctx.send(f"User with ID `{user_id}` has been unbanned from {guild.name}.")
+            await ctx.send("I do not have permission to unban this user.")
+        except Exception as e:
+            await ctx.send(f"An error occurred while unbanning: {e}")
 
 async def setup(bot: Red):
     await bot.add_cog(ServerBan(bot))
