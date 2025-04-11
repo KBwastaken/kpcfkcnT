@@ -24,7 +24,7 @@ class ServerBan(commands.Cog):
             return
 
         if not reason:
-            reason = f"Action requested by {moderator.name} ({moderator.id})"
+            reason = "globalban" if is_global else f"Action requested by {moderator.name} ({moderator.id})"
 
         try:
             user = await self.bot.fetch_user(user_id)
@@ -76,6 +76,7 @@ class ServerBan(commands.Cog):
 
         target_guilds = self.bot.guilds if is_global else [ctx.guild]
         successful_unbans = []
+        failed_guilds = []
 
         for guild in target_guilds:
             is_banned = False
@@ -93,27 +94,34 @@ class ServerBan(commands.Cog):
 
             try:
                 await guild.unban(discord.Object(id=user_id), reason=reason)
-                successful_unbans.append(guild.name)
+                successful_unbans.append(guild)
                 await ctx.send(f"Unbanned `{user_id}` in {guild.name}.")
             except Exception as e:
+                failed_guilds.append(guild.name)
                 await ctx.send(f"Failed to unban in {guild.name}: {e}")
 
         if successful_unbans:
             try:
                 user = await self.bot.fetch_user(user_id)
-                invite = await ctx.guild.text_channels[0].create_invite(max_uses=1, unique=True)
                 channel = user.dm_channel or await user.create_dm()
 
                 embed = discord.Embed(
                     title="You have been unbanned",
                     description=f"**Reason:** {reason}\n\n"
                                 f"**Server:** {'Multiple Servers' if is_global else ctx.guild.name}\n\n"
-                                "Click the button below to rejoin the server.",
+                                "Click the button(s) below to rejoin the server(s).",
                     color=discord.Color.green()
                 )
                 view = discord.ui.View()
-                button = discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link)
-                view.add_item(button)
+
+                for g in successful_unbans:
+                    try:
+                        invite = await g.text_channels[0].create_invite(max_uses=1, unique=True)
+                        button = discord.ui.Button(label=f"Rejoin {g.name}", url=invite.url, style=discord.ButtonStyle.link)
+                        view.add_item(button)
+                    except Exception:
+                        continue
+
                 await channel.send(embed=embed, view=view)
             except discord.HTTPException:
                 await ctx.send("Could not DM the user, but they were unbanned.")
