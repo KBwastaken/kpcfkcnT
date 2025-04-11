@@ -23,8 +23,10 @@ class ServerBan(commands.Cog):
             await ctx.send("You are not authorized to use global bans.")
             return
 
+        target_guilds = self.bot.guilds if is_global else [ctx.guild]
+
         if not reason:
-            reason = "globalban" if is_global else f"Action requested by {moderator.name} ({moderator.id})"
+            reason = f"servers: globalban" if is_global and len(target_guilds) > 1 else f"Action requested by {moderator.name} ({moderator.id})"
 
         try:
             user = await self.bot.fetch_user(user_id)
@@ -42,7 +44,6 @@ class ServerBan(commands.Cog):
         except discord.HTTPException:
             await ctx.send("Could not DM the user, but proceeding with the ban.")
 
-        target_guilds = self.bot.guilds if is_global else [ctx.guild]
         for guild in target_guilds:
             try:
                 is_banned = False
@@ -117,7 +118,10 @@ class ServerBan(commands.Cog):
 
                 for g in successful_unbans:
                     try:
-                        invite = await g.text_channels[0].create_invite(max_uses=1, unique=True)
+                        text_channels = [c for c in g.text_channels if c.permissions_for(g.me).create_instant_invite]
+                        if not text_channels:
+                            continue
+                        invite = await text_channels[0].create_invite(max_uses=1, unique=True)
                         button = discord.ui.Button(label=f"Rejoin {g.name}", url=invite.url, style=discord.ButtonStyle.link)
                         view.add_item(button)
                     except Exception:
