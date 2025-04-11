@@ -80,12 +80,15 @@ class ServerBan(commands.Cog):
         failed_guilds = []
         skipped_unbans = []
 
+        banned_servers = []  # List to track the guilds where the user is banned
+
         for guild in target_guilds:
             try:
                 is_banned = False
                 async for entry in guild.bans():
                     if entry.user.id == user_id:
                         is_banned = True
+                        banned_servers.append(guild)  # Add to list of banned servers
                         break
             except Exception as e:
                 failed_guilds.append(f"{guild.name} (error checking ban: {e})")
@@ -116,7 +119,8 @@ class ServerBan(commands.Cog):
                 )
                 view = discord.ui.View()
 
-                for g in successful_unbans:
+                # Add a button for each server the user was banned from
+                for g in banned_servers:
                     try:
                         text_channels = [c for c in g.text_channels if c.permissions_for(g.me).create_instant_invite]
                         if not text_channels:
