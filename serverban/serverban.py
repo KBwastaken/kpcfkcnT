@@ -1,7 +1,7 @@
 import discord
 from redbot.core import commands
-from redbot.core.bot import Red
 from discord import app_commands
+from redbot.core.bot import Red
 
 ALLOWED_GLOBAL_IDS = {1174820638997872721, 1274438209715044415, 690239097150767153}
 APPEAL_LINK = "https://forms.gle/gR6f9iaaprASRgyP9"
@@ -22,8 +22,13 @@ class ServerBan(commands.Cog):
 
     @app_commands.command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
     @app_commands.describe(user_id="The ID of the user to ban", global_flag="Should this be a global ban?", reason="Reason for banning the user")
-    async def sban(self, interaction: discord.Interaction, user_id: int, global_flag: str, reason: str = None):
+    async def sban(self, interaction: discord.Interaction, user_id: str, global_flag: str, reason: str = None):
         """Ban a user by ID with optional global effect and DM appeal info."""
+        try:
+            user_id = int(user_id)  # Convert user_id to an integer
+        except ValueError:
+            return await interaction.response.send_message("Please provide a valid user ID as an integer.")
+
         moderator = interaction.user
         is_global = global_flag.lower() == "yes"
 
@@ -69,8 +74,13 @@ class ServerBan(commands.Cog):
 
     @app_commands.command(name="sunban", description="Unban a user and send them an invite link, trying to use past DMs first.")
     @app_commands.describe(user_id="The ID of the user to unban", reason="Reason for unbanning the user")
-    async def sunban(self, interaction: discord.Interaction, user_id: int, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
+    async def sunban(self, interaction: discord.Interaction, user_id: str, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
         """Unban a user and send them an invite link, trying to use past DMs first."""
+        try:
+            user_id = int(user_id)  # Convert user_id to an integer
+        except ValueError:
+            return await interaction.response.send_message("Please provide a valid user ID as an integer.")
+
         guild = interaction.guild
         invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
 
