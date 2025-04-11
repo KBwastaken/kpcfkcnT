@@ -77,6 +77,7 @@ class ServerBan(commands.Cog):
         target_guilds = self.bot.guilds if is_global else [ctx.guild]
         successful_unbans = []
         failed_guilds = []
+        skipped_unbans = []
 
         for guild in target_guilds:
             is_banned = False
@@ -85,11 +86,12 @@ class ServerBan(commands.Cog):
                     if entry.user.id == user_id:
                         is_banned = True
                         break
-            except Exception:
+            except Exception as e:
+                failed_guilds.append(f"{guild.name} (error checking ban: {e})")
                 continue
 
             if not is_banned:
-                await ctx.send(f"User is already unbanned or not banned in {guild.name}.")
+                skipped_unbans.append(guild.name)
                 continue
 
             try:
@@ -97,8 +99,7 @@ class ServerBan(commands.Cog):
                 successful_unbans.append(guild)
                 await ctx.send(f"Unbanned `{user_id}` in {guild.name}.")
             except Exception as e:
-                failed_guilds.append(guild.name)
-                await ctx.send(f"Failed to unban in {guild.name}: {e}")
+                failed_guilds.append(f"{guild.name} (unban error: {e})")
 
         if successful_unbans:
             try:
@@ -125,6 +126,17 @@ class ServerBan(commands.Cog):
                 await channel.send(embed=embed, view=view)
             except discord.HTTPException:
                 await ctx.send("Could not DM the user, but they were unbanned.")
+
+        summary = ""
+        if successful_unbans:
+            summary += f"✅ Successfully unbanned from: {', '.join(g.name for g in successful_unbans)}\n"
+        if skipped_unbans:
+            summary += f"⚠️ Already unbanned or not banned in: {', '.join(skipped_unbans)}\n"
+        if failed_guilds:
+            summary += f"❌ Failed in: {', '.join(failed_guilds)}"
+
+        if summary:
+            await ctx.send(f"**Unban Summary:**\n{summary}")
 
 async def setup(bot: Red):
     await bot.add_cog(ServerBan(bot))
