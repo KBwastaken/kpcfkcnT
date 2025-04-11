@@ -87,16 +87,15 @@ class ServerBan(commands.Cog):
                 failed_guilds.append(f"{guild.name} (error checking ban: {e})")
                 continue
 
-            if not is_banned:
+            if is_banned:
+                try:
+                    await guild.unban(discord.Object(id=user_id), reason=reason)
+                    successful_unbans.append(guild)
+                    await ctx.send(f"Unbanned `{user_id}` in {guild.name}.")
+                except Exception as e:
+                    failed_guilds.append(f"{guild.name} (unban error: {e})")
+            else:
                 skipped_unbans.append(guild.name)
-                continue
-
-            try:
-                await guild.unban(discord.Object(id=user_id), reason=reason)
-                successful_unbans.append(guild)
-                await ctx.send(f"Unbanned `{user_id}` in {guild.name}.")
-            except Exception as e:
-                failed_guilds.append(f"{guild.name} (unban error: {e})")
 
         # After processing, send a summary of the unban attempts
         if successful_unbans:
