@@ -22,6 +22,12 @@ class ServerBan(commands.Cog):
 
     @app_commands.command(name="sban", description="Ban a user by ID with optional global effect and DM appeal info.")
     @app_commands.describe(user_id="The ID of the user to ban", reason="Reason for banning the user")
+    @app_commands.choices(
+        is_global=[
+            app_commands.Choice(name="Yes", value="yes"),
+            app_commands.Choice(name="No", value="no")
+        ]
+    )
     async def sban(self, interaction: discord.Interaction, user_id: str, is_global: str, reason: str = None):
         """Ban a user by ID with optional global effect and DM appeal info."""
         try:
@@ -130,4 +136,3 @@ class ServerBan(commands.Cog):
             await interaction.response.send_message("I do not have permission to unban this user.")
         except Exception as e:
             await interaction.response.send_message(f"An error occurred while unbanning: {e}")
-
