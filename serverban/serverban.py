@@ -56,6 +56,8 @@ class ServerBan(commands.Cog):
         except discord.HTTPException:
             await interaction.response.send_message("Could not DM the user, but proceeding with the ban.")
 
+        ban_errors = []  # List to store errors if any occur during banning
+
         for guild in target_guilds:
             try:
                 is_banned = False
@@ -64,14 +66,20 @@ class ServerBan(commands.Cog):
                         is_banned = True
                         break
                 if is_banned:
-                    await interaction.response.send_message(f"User is already banned in {guild.name}.")
+                    ban_errors.append(f"User is already banned in {guild.name}.")
                     continue
 
                 await guild.ban(discord.Object(id=user_id), reason=reason)
-                await interaction.response.send_message(f"Banned {user_id} in {guild.name}.")
+                ban_errors.append(f"Banned {user_id} in {guild.name}.")
             except Exception as e:
-                await interaction.response.send_message(f"Failed to ban in {guild.name}: {e}")
+                ban_errors.append(f"Failed to ban in {guild.name}: {e}")
 
+        # Send a final response only once, containing all the errors and successes
+        if ban_errors:
+            await interaction.response.send_message("\n".join(ban_errors))
+        else:
+            await interaction.response.send_message(f"User {user_id} banned successfully in all target servers.")
+    
     @app_commands.command(name="sunban", description="Unban a user and send them an invite link, trying to use past DMs first.")
     @app_commands.describe(user_id="The ID of the user to unban", reason="Reason for unbanning the user")
     async def sunban(self, interaction: discord.Interaction, user_id: str, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
