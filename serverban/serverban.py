@@ -37,11 +37,14 @@ class ServerBan(commands.Cog):
 
         moderator = interaction.user
 
+        # Defer the response to let Discord know you're working on it
+        await interaction.response.defer()
+
         # Convert is_global to boolean from string (Yes = True, No = False)
         is_global = True if is_global.lower() == 'yes' else False
 
         if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
-            return await interaction.response.send_message("You are not authorized to use global bans.")
+            return await interaction.followup.send("You are not authorized to use global bans.")
 
         target_guilds = self.bot.guilds if is_global else [interaction.guild]
 
@@ -62,7 +65,7 @@ class ServerBan(commands.Cog):
             embed.set_footer(text="Appeals are reviewed by the moderation team.")
             await user.send(embed=embed)
         except discord.HTTPException:
-            await interaction.response.send_message("Could not DM the user, but proceeding with the ban.")
+            await interaction.followup.send("Could not DM the user, but proceeding with the ban.")
 
         ban_errors = []  # List to store errors if any occur during banning
 
@@ -84,55 +87,55 @@ class ServerBan(commands.Cog):
 
         # Send a final response only once, containing all the errors and successes
         if ban_errors:
-            await interaction.response.send_message("\n".join(ban_errors))
+            await interaction.followup.send("\n".join(ban_errors))
         else:
             # Make sure we indicate the global status in the final message
             global_status = "globally" if is_global else "locally"
-            await interaction.response.send_message(f"User {user_id} banned {global_status} in all target servers.")
+            await interaction.followup.send(f"User {user_id} banned {global_status} in all target servers.")
 
-    @app_commands.command(name="sunban", description="Unban a user and send them an invite link, trying to use past DMs first.")
-    @app_commands.describe(user_id="The ID of the user to unban", reason="Reason for unbanning the user")
-    async def sunban(self, interaction: discord.Interaction, user_id: str, reason: str = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below"):
-        """Unban a user and send them an invite link, trying to use past DMs first."""
+    @app_commands.command(name="sunban", description="Unban a user by ID with optional global effect.")
+    @app_commands.describe(user_id="The ID of the user to unban")
+    @app_commands.choices(
+        is_global=[
+            app_commands.Choice(name="Yes", value="yes"),
+            app_commands.Choice(name="No", value="no")
+        ]
+    )
+    async def sunban(self, interaction: discord.Interaction, user_id: str, is_global: str):
+        """Unban a user by ID with optional global effect."""
         try:
             user_id = int(user_id)  # Convert user_id to an integer
         except ValueError:
             return await interaction.response.send_message("Please provide a valid user ID as an integer.")
 
-        guild = interaction.guild
-        invite = await guild.text_channels[0].create_invite(max_uses=1, unique=True)
+        moderator = interaction.user
 
-        try:
-            # Try to unban the user directly without iterating through the bans list
-            await guild.unban(discord.Object(id=user_id), reason=reason)
+        # Defer the response to let Discord know you're working on it
+        await interaction.response.defer()
 
-            # If no error occurred, proceed to send DM to the user
+        # Convert is_global to boolean from string (Yes = True, No = False)
+        is_global = True if is_global.lower() == 'yes' else False
+
+        if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
+            return await interaction.followup.send("You are not authorized to use global unbans.")
+
+        target_guilds = self.bot.guilds if is_global else [interaction.guild]
+
+        unban_errors = []  # List to store errors if any occur during unbanning
+
+        for guild in target_guilds:
             try:
-                user = await self.bot.fetch_user(user_id)
-                channel = user.dm_channel or await user.create_dm()
-
-                embed = discord.Embed(
-                    title="You have been unbanned",
-                    description=f"**Reason:** {reason}\n\n"
-                                f"**Server:** {guild.name}\n\n"
-                                "Click the button below to rejoin the server.",
-                    color=discord.Color.green()
-                )
-                view = discord.ui.View()
-                button = discord.ui.Button(label="Rejoin Server", url=invite.url, style=discord.ButtonStyle.link)
-                view.add_item(button)
-
-                await channel.send(embed=embed, view=view)
+                await guild.unban(discord.Object(id=user_id))
+                unban_errors.append(f"Unbanned {user_id} in {guild.name}.")
             except discord.NotFound:
-                await interaction.response.send_message("User not found. They may have deleted their account.")
-            except discord.Forbidden:
-                await interaction.response.send_message("Could not DM the user.")
+                unban_errors.append(f"User {user_id} was not found in {guild.name}.")
+            except Exception as e:
+                unban_errors.append(f"Failed to unban in {guild.name}: {e}")
 
-            await interaction.response.send_message(f"User with ID {user_id} has been unbanned from {guild.name}.")
-
-        except discord.NotFound:
-            await interaction.response.send_message("The user is not banned.")
-        except discord.Forbidden:
-            await interaction.response.send_message("I do not have permission to unban this user.")
-        except Exception as e:
-            await interaction.response.send_message(f"An error occurred while unbanning: {e}")
+        # Send a final response only once, containing all the errors and successes
+        if unban_errors:
+            await interaction.followup.send("\n".join(unban_errors))
+        else:
+            # Make sure we indicate the global status in the final message
+            global_status = "globally" if is_global else "locally"
+            await interaction.followup.send(f"User {user_id} unbanned {global_status} in all target servers.")
