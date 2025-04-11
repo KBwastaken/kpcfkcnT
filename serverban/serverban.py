@@ -64,9 +64,13 @@ class ServerBan(commands.Cog):
     @commands.guild_only()
     @commands.admin_or_permissions(ban_members=True)
     async def sunban(self, ctx: commands.Context, user_id: int, global_flag: str, *, reason: str = None):
-        """Unban a user by ID in the guilds the bot is currently in."""
+        """Unban a user by ID with optional global scope and DM rejoin invite."""
         moderator = ctx.author
         is_global = global_flag.lower() == "yes"
+
+        if is_global and moderator.id not in ALLOWED_GLOBAL_IDS:
+            await ctx.send("You are not authorized to use global unbans.")
+            return
 
         if not reason:
             reason = "Your application has been accepted, you can now rejoin the server using the previous link or by requesting it with the button below."
@@ -75,8 +79,14 @@ class ServerBan(commands.Cog):
         failed_guilds = []
         skipped_unbans = []
 
-        # Loop through the guilds the bot is in
-        for guild in self.bot.guilds:
+        # Logic for global unbanning (across all servers the bot is in)
+        if is_global:
+            target_guilds = self.bot.guilds  # Get all the guilds the bot is in
+        else:
+            target_guilds = [ctx.guild]  # Only target the current server if not global
+
+        # Loop through each server the bot is in and check if the user is banned
+        for guild in target_guilds:
             try:
                 is_banned = False
                 async for entry in guild.bans():
